@@ -20,7 +20,7 @@
     "skipLibCheck": true,
     "incremental": true,
     "module": "esnext",
-    "noImplicitAny": false,
+    "noImplicitAny": true,
     "plugins": [
       {
         "name": "next"
