@@ -4,7 +4,7 @@ import { resource_type } from './outpost_mapping';
 import Image from 'next/image'
 import rightArrow from '@images/icons/right_arrow_white.svg';
 
-export default function Outposts({ deal, borderBottom }) {
+export default function TradeSingle({ deal, borderBottom }) {
     const cost_item = resource_type[deal.id];
     const cost_label = deal.subtype ? cost_item.subtypes[deal.subtype].label : cost_item.label;
     const cost_img = deal.subtype ? cost_item.subtypes[deal.subtype].img : cost_item.img;

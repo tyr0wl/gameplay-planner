@@ -2,6 +2,8 @@ import general_helper from './helper';
 import math_helper from "./math";
 import { getPet, BonusMap } from "./itemMapping";
 import { DecimalSource } from 'break_infinity.js';
+import { PetBonus, PetData } from '@app/SaveGameData';
+import { Dispatch, SetStateAction } from 'react';
 
 export type groupScore = {
     groupScore: number,
@@ -19,6 +21,31 @@ export type groupScore = {
     tokenModif: number,
     tokenMult: number,
 };
+
+export type findBestGroupsOptions = {
+    tokenDamageBias: number,
+    activeBonuses: any[],
+    setFailedFilters: Dispatch<SetStateAction<any>>,
+    petWhiteList: PetPlacementData[],
+    usePromos: boolean,
+    maxTopStat: boolean,
+    ignorePetRanks: boolean,
+};
+
+export type PetPlacementData = {
+    id: number
+    placement: 'rel' | 'blacklist' | 'auto' | 'team',
+    label: string,
+    parameters: { team: number, damageBias: number, fake?: boolean },
+    auto?: boolean,
+    pet: PetData,
+}
+
+export enum GroupRankCriteria {
+    Damage = 1,
+    Tokens = 2,
+    Unknown = 3,
+}
 
 const helper = {
     EXP_DMG_MOD: .1,
@@ -574,30 +601,32 @@ const helper = {
         // finalPetsCollection.sort((a, b) => b.ID - a.ID);
         // return finalPetsCollection;
     },
-    calcBestDamageGroup: function (PETSCOLLECTION, defaultRank, numGroups, other) {
-        const k = 4; // Size of each group
+    calcBestDamageGroup: function (PETSCOLLECTION: PetData[], defaultRank: number, numGroups: number, options: findBestGroupsOptions): PetData[][] {
+        const groupSize = 4; // Size of each group
         numGroups = numGroups ? numGroups : 7;
         numGroups = Number(numGroups);
-        const memo = {};
+        type memo = { [groupId: number]: { token: number, damage: number, other: groupScore } };
+        const memo: memo = {};
         let failedFiltersObj = {};
-        let petsMap = {};
+        let petsMap : { [petId: number]: PetData } = {};
 
-        other = JSON.parse(JSON.stringify(other));
+        options = JSON.parse(JSON.stringify(options));
 
-        for (let i = 0; i < PETSCOLLECTION.length; i++) {
-            petsMap[PETSCOLLECTION[i].ID] = JSON.parse(JSON.stringify(PETSCOLLECTION[i]))
+        for (const petDatum of PETSCOLLECTION) {
+            petsMap[petDatum.ID] = JSON.parse(JSON.stringify(petDatum));
         }
 
-        let activeBonuses = other?.activeBonuses;
-        if (!activeBonuses) activeBonuses = [];
+        let activeBonuses = options?.activeBonuses ?? [];
 
-        const memoizedGroupScore = (group) => {
+        const memoizedGroupScore = (group: { ID: string, team: PetData[] }) => {
             const key = group.ID;
+
             if (!memo[key] || memo[key]) {
                 let res = this.calculateGroupScore(group.team, defaultRank);
                 let sum = res.tokenMult;
-                memo[key] = {token: sum, damage: res.groupScore, other: res};
+                memo[key] = { token: sum, damage: res.groupScore, other: res };
             }
+
             return memo[key];
         };
 
@@ -612,9 +641,9 @@ const helper = {
             psuedoGroups.push([]);
         }
 
-        if (other?.petWhiteList) {
-            for (let i = 0; i < other.petWhiteList.length; i++) {
-                let cur = other.petWhiteList[i];
+        if (options?.petWhiteList) {
+            for (let i = 0; i < options.petWhiteList.length; i++) {
+                let cur = options.petWhiteList[i];
                 if (cur.placement === 'blacklist') {
                     blackList[cur.id] = cur;
                 } else if (cur.placement === 'team') {
@@ -630,8 +659,8 @@ const helper = {
             }
 
             //Go over any `auto placements and slot them in in a pseudo manner
-            for (let i = 0; i < other.petWhiteList.length; i++) {
-                let cur = other.petWhiteList[i];
+            for (let i = 0; i < options.petWhiteList.length; i++) {
+                let cur = options.petWhiteList[i];
 
                 if (cur.placement === 'auto') {
 
@@ -656,7 +685,7 @@ const helper = {
                             continue;
                         }
 
-                        if (psuedoGroups[j].length < k) {
+                        if (psuedoGroups[j].length < groupSize) {
                             cur.auto = true;
                             cur.parameters.team = j;
                             cur.placement = 'team';
@@ -670,11 +699,10 @@ const helper = {
             }
         }
 
-
-        const getCombinationsInner = (array, k, bonusList) => {
+        const getCombinationsInner = (array: PetData[], k: number, bonusList: PetPlacementData[]) => {
 
             // let temp = [];
-            let best: any = -1;
+            let best: { ID: string, team: PetData[], score: { token: number, damage: number, other: groupScore } } = null;
 
             //confirm there is enough gnd/air for perfect synergy
             let airTemp = 0;
@@ -723,7 +751,7 @@ const helper = {
             }
 
 
-            const f = (start, prevCombination) => {
+            const f = (start: number, prevCombination: PetData[]) => {
 
                 if (prevCombination.length > 0) {
 
@@ -998,9 +1026,9 @@ const helper = {
                                     id = id + ','
                                 }
                             }
-                            let x = {ID: id, team: prevCombination};
+                            let x = { ID: id, team: prevCombination };
                             // temp.push(x);
-                            if (best === -1) {
+                            if (best === null) {
                                 best = {ID: id, team: prevCombination, score: memoizedGroupScore(x)};
                             } else {
                                 let cur = memoizedGroupScore(x);
@@ -1252,26 +1280,26 @@ const helper = {
             for (let j = 0; j < whiteListReqPets.length; j++) {
                 bonusList.push(whiteListReqPets[j]);
             }
-            let combinations = getCombinationsInner(finalPetsCollection, Math.min(k, finalPetsCollection.length), bonusList);
+            let combinations = getCombinationsInner(finalPetsCollection, Math.min(groupSize, finalPetsCollection.length), bonusList);
             time2 = new Date();
             // @ts-ignore
             console.log(`time to get combinations ${combinations.length}: ${(time2 - time1) / 1000} seconds`);
 
             //Check if we can create valid teams with only whitelist pets
-            if (combinations === -1 && whiteListReqPets.length > 0) {
+            if (combinations === null && whiteListReqPets.length > 0) {
 
                 bonusList = [];
                 for (let j = 0; j < whiteListReqPets.length; j++) {
                     bonusList.push(whiteListReqPets[j]);
                 }
-                combinations = getCombinationsInner(finalPetsCollection, Math.min(k, finalPetsCollection.length), bonusList);
-                if (combinations === -1) {
+                combinations = getCombinationsInner(finalPetsCollection, Math.min(groupSize, finalPetsCollection.length), bonusList);
+                if (combinations === null) {
                     skipChecks = true;
                 } else {
                     ignoreCustomBonuses = true;
                 }
             }
-            if (combinations === -1) {
+            if (combinations === null) {
                 skipChecks = true;
             }
 
@@ -1475,10 +1503,10 @@ const helper = {
                             bonusList.push(whiteListReqPets[j]);
                             // }
                         }
-                        let combinations_rel = getCombinationsInner(finalPetsCollection, Math.min(k, finalPetsCollection.length), bonusList);
+                        let combinations_rel = getCombinationsInner(finalPetsCollection, Math.min(groupSize, finalPetsCollection.length), bonusList);
                         console.log(`got new combinations after the rel calcs`)
 
-                        if (combinations_rel !== -1) {
+                        if (combinations_rel !== null) {
                             //Only filter out the fake `rel` whitelisted pets, if they WERE selected by the combo
                             whiteListReqPets = whiteListReqPets.filter((e) => {
                                 let temp = combinations_rel;
@@ -1493,13 +1521,13 @@ const helper = {
                         }
 
                         //Only hard crash in case of no backup team that is possible
-                        if (combinations_rel === -1 && whiteListReqPets.length === 0) {
+                        if (combinations_rel === null && whiteListReqPets.length === 0) {
 
                             if (!(`generic` in failedFiltersObj)) {
                                 failedFiltersObj[`generic`] = `Individual filters all succeeded, but the combination of all is impossible starting group ${g + 1} (too many relative pets in one team)`;
                             }
                             break;
-                        } else if (combinations_rel !== -1) {
+                        } else if (combinations_rel !== null) {
 
                             combinations = combinations_rel;
 
@@ -1570,8 +1598,8 @@ const helper = {
         time4 = new Date();
         // @ts-ignore
         console.log(`time to get best combo: ${(time4 - time3) / 1000} seconds`)
-        if (other?.setFailedFilters) {
-            other.setFailedFilters(failedFiltersObj);
+        if (options?.setFailedFilters) {
+            options.setFailedFilters(failedFiltersObj);
         }
 
         // // Reset any auto placements back to proper auto for visual purposes
@@ -1979,15 +2007,15 @@ const helper = {
         // bestGroups.sort()
         return bestGroups;
     },
-    findBestGroups: function (petsCollection, defaultRank, groupRankCritera, numGroups, other) {
+    findBestGroups: function (petsCollection: PetData[], defaultRank: number, groupRankCriteria: GroupRankCriteria, numGroups: number, options: findBestGroupsOptions): PetData[][] {
 
-        switch (groupRankCritera) {
-            case 1: //damage focus
-                return this.calcBestDamageGroup(petsCollection, defaultRank, numGroups, other);
-            case 2: // token focus
-                return this.calcBestTokenGroup(petsCollection, defaultRank, numGroups, other);
-            case 3:
-                return this.calcBestDamageGroup(petsCollection, defaultRank, numGroups, other);
+        switch (groupRankCriteria) {
+            case GroupRankCriteria.Damage: //damage focus
+                return this.calcBestDamageGroup(petsCollection, defaultRank, numGroups, options);
+            case GroupRankCriteria.Tokens: // token focus
+                return this.calcBestTokenGroup(petsCollection, defaultRank, numGroups, options);
+            case GroupRankCriteria.Unknown:
+                return this.calcBestDamageGroup(petsCollection, defaultRank, numGroups, options);
         }
     },
     calcEquipBonus: function (pet, bonusInner, level=null, rank=null) {

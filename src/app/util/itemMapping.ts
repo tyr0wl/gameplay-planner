@@ -679,7 +679,7 @@ export const petNames = PetNames;
 
 export const petNameArray = Object.entries(PetNames).map(([key, value]) => {
     // if (key === '0' || key === 0 || key === 9999 || key === '9999') return null;
-    if (!petNames[key]) {
+    if (!petNames[+key]) {
         return {
             ...value,
             'petId': parseInt(key, 10),
@@ -689,22 +689,21 @@ export const petNameArray = Object.entries(PetNames).map(([key, value]) => {
     return {
         ...value,
         'petId': parseInt(key, 10),
-        'img': petNames[key].img
+        'img': petNames[+key].img
     };
 }) as petDatum2[];
 
-export const petNamesById = petNameArray.reduce((accum, petNameData) => {
+export const petNamesById = petNameArray.reduce((accum: { [petId: number]: petDatum2 }, petNameData) => {
     accum[petNameData.petId] = petNameData;
     return accum;
 }, {});
 
-export const getPet = (id) => {
+export const getPet = (id: number) => {
     if (id in petNames) {
         return { ...petNames[id], petId: id };
     }
     return { ...petNames[9999], petId: id };
 }
-
 
 export const ir_id = 6;
 export const reinc_id = 5;
@@ -731,8 +730,22 @@ export const reinc_pts_id = 31;
 export const fry_id = 27;
 export const op_level_id = 38;
 
+export type BonusItem = {
+    id: number,
+    label: string,
+    rootName?: string,
+    defaultWeight?: number,
+    disabled?: boolean,
+    odd?: boolean,
+    img?: StaticImageData | null,
+}
 
-export const BonusMap = {
+export type BonusMap = {
+    [id: number]: BonusItem,
+    "_": BonusItem,
+}
+
+export const BonusMap: BonusMap = {
     _: { disabled: false, defaultWeight: 1, id: -1, label: "Unknown", img: null },
     1: { disabled: false, defaultWeight: 25, id: 1, label: "Potato", img: potatoesAL },
     2: { disabled: false, defaultWeight: 40, id: 2, label: "Class Exp", img: classAL },
@@ -812,11 +825,8 @@ export const BonusMap = {
 
 const standardBonusesWeightListCount = Array.from({ length: 22 }, (x, i) => i);
 export const standardBonusesWeightList = standardBonusesWeightListCount.map((idx, i) => BonusMap[i + 1]);
-export const standardBonusesWeightById = standardBonusesWeightListCount.reduce((accum, item, i) => {
-    accum[i] = item;
-    return accum;
-}, {});
-export const DefaultWeightMappings = {
+
+export const DefaultWeightMappings: { [id: number]: { id: number, weight: number, } }  = {
     1: { id: 1, weight: .0015 },
     2: { id: 2, weight: .003 },
     3: { id: 3, weight: .003 },
@@ -841,13 +851,18 @@ export const DefaultWeightMappings = {
     22: { id: 22, weight: 10 },
     31: { id: 31, weight: 50 },
 }
-const StandardBonusesWeightMap = standardBonusesWeightList.reduce((accum, item, i) => {
-    const newItem = {
+
+export type BonusItemWeight = BonusItem & { weight: number };
+
+export type BonusItemWeightMap = { [id: number]: BonusItemWeight }
+
+const StandardBonusesWeightMap = standardBonusesWeightList.reduce((accum: BonusItemWeightMap, item, i) => {
+    accum[item.id] = {
         ...item, // should be BonusMap {id, label}
         weight: DefaultWeightMappings[item.id].weight
     };
 
-    accum[item.id] = newItem;
     return { ...accum };
 }, {});
-export const DefaultWeightMap = StandardBonusesWeightMap;
+
+export const DefaultWeightMap: BonusItemWeightMap = StandardBonusesWeightMap;

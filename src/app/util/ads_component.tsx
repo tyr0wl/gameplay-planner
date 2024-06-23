@@ -1,12 +1,16 @@
-"use client"
+'use client';
 
 import { isMobile } from 'mobile-device-detect';
+import helper from '../util/helper';
+import { useEffect, useRef, useState } from 'react';
+import useMobileViewport from '@util/useMobileViewport';
+
 const create_rightPillar_flex = function () {
     let holder_div = document.createElement('div');
     holder_div.style.zIndex = '99';
 
-    let div_id = document.createElement("div");
-    div_id.id = "mmt-34313a9b-cd87-458f-a4c0-86ffb8000bcb";
+    let div_id = document.createElement('div');
+    div_id.id = 'mmt-34313a9b-cd87-458f-a4c0-86ffb8000bcb';
 
     // div_id.style.width = '320px';
     // div_id.style.height = '600px';
@@ -17,13 +21,14 @@ const create_rightPillar_flex = function () {
     const fragment = document.createRange().createContextualFragment(script_holder);
     holder_div.appendChild(fragment);
     return holder_div;
-}
+};
+
 const create_rightPillar_160 = function () {
     let holder_div = document.createElement('div');
     holder_div.style.zIndex = '99';
 
-    let div_id = document.createElement("div");
-    div_id.id = "mmt-2fd46f54-877d-4253-b8e9-3d94a7703d59";
+    let div_id = document.createElement('div');
+    div_id.id = 'mmt-2fd46f54-877d-4253-b8e9-3d94a7703d59';
 
     // div_id.style.width = '200px';
     // div_id.style.height = '600px';
@@ -34,13 +39,14 @@ const create_rightPillar_160 = function () {
     const fragment = document.createRange().createContextualFragment(script_holder);
     holder_div.appendChild(fragment);
     return holder_div;
-}
+};
+
 const create_in_content_flex = function () {
     let holder_div = document.createElement('div');
     holder_div.style.zIndex = '99';
 
-    let div_id = document.createElement("div");
-    div_id.id = "mmt-cb211802-3e88-4915-a21b-2982de4b3e62";
+    let div_id = document.createElement('div');
+    div_id.id = 'mmt-cb211802-3e88-4915-a21b-2982de4b3e62';
 
     // div_id.style.width = '320px';
     // div_id.style.height = '100px';
@@ -51,33 +57,19 @@ const create_in_content_flex = function () {
     const fragment = document.createRange().createContextualFragment(script_holder);
     holder_div.appendChild(fragment);
     return holder_div;
+};
+
+{/* <script async type="text/javascript" src="//monu.delivery/site/a/5/892ed4-6227-41b8-95d2-9c7cb4ffe471.js" data-cfasync="false"></script>*/
 }
 
-{/* <script async type="text/javascript" src="//monu.delivery/site/a/5/892ed4-6227-41b8-95d2-9c7cb4ffe471.js" data-cfasync="false"></script>*/ }
+export default (process.env.NODE_ENV === 'development' ? function Ad_Comp(){ return <></>; } : function Ad_Comp() {
 
-
-import helper from '../util/helper';
-import { useRef, useState, useEffect } from 'react';
-export default function Ad_Comp() {
-    const setup_started = useRef(false) // gets assigned to a root node
+    const setup_started = useRef(false); // gets assigned to a root node
 
     const [mobileMode, setMobileMode] = useState(false);
     const [mobileSet, setMobileSet] = useState(false);
-    useEffect(() => {
-        setMobileMode(isMobile);
-        setMobileSet(true);
-        if (isMobile) {
-            setTimeout(() => {
-                const viewport = document.querySelector('meta[name="viewport"]');
-                if (viewport instanceof HTMLMetaElement) {
-                    viewport.content = "initial-scale=0.1";
-                    viewport.content = "width=1200";
-                }
-            }, 500);
-        }
-    }, []);
 
-
+    useMobileViewport();
 
     useEffect(() => {
 
@@ -109,7 +101,7 @@ export default function Ad_Comp() {
             const new_element = create_rightPillar_flex();
             // new_element.style.backgroundColor = 'yellow';
             right_pillar.appendChild(new_element);
-        }
+        };
         setup_function_right_pillar();
 
 
@@ -129,7 +121,7 @@ export default function Ad_Comp() {
 
             const new_element = create_rightPillar_160();
             right_pillar.appendChild(new_element);
-        }
+        };
         setup_function_right_pillar160();
 
         const setup_function_in_content_flex = async () => {
@@ -151,12 +143,12 @@ export default function Ad_Comp() {
 
             const new_element = create_in_content_flex();
             in_content_flex.appendChild(new_element);
-        }
+        };
         setup_function_in_content_flex();
 
         return;
 
     }, [mobileSet]);
 
-    return <></>
-}
+    return <></>;
+});
