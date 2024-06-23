@@ -1,18 +1,13 @@
-"use client"
+'use client';
 
 import Image from 'next/image';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import useLocalStorage from "use-local-storage";
+import {ReactNode, useEffect, useRef, useState} from 'react';
+import useLocalStorage from 'use-local-storage';
+import ReactGA from 'react-ga4';
 
-import { isMobile } from 'mobile-device-detect';
 import './JSONDisplay.css'; // Add this line to import the CSS file
-import { BonusMap, petNameArray, petNames, getPet, DefaultWeightMap } from '../util/itemMapping';
 import PetItemCoin from './PetItemCoin';
-import ItemSelection from "../util/ItemSelection copy";
-import MouseOverPopover from "../util/Tooltip";
 
-import helper from '../util/helper';
-import mathHelper from '../util/math';
 import xIcon from "@images/icons/x_icon.svg"
 import pinIcon from "@images/icons/pin-line-icon.svg"
 import trashIcon from "@images/icons/trash-can-icon.svg"
@@ -23,98 +18,47 @@ import infoIconAmber from '@images/icons/info_amber.svg';
 import rankExplain from "@images/rank_explain.png"
 import missing from "@images/pets/missing.png"
 
-import ReactGA from "react-ga4";
-//import { GoogleAdSense } from "next-google-adsense";
-import SearchBox from '../util/search';
-import petHelper from '../util/petHelper';
-import DefaultSave from '../util/tempSave.json';
-import {
-    mainTeamSuggestions, reincTeamSuggestions, gearTeamSuggestions,
-    // statTeamSuggestions,
-    maxKey
-} from '../pets/teamSuggestions';
+import helper from '@util/helper';
+import mathHelper from '@util/math';
+import SearchBox from '@util/search';
+import petHelper, { PetPlacementData } from '@util/petHelper';
+import DefaultSave from '@util/tempSave.json';
+import MouseOverPopover from '@util/Tooltip';
+import ItemSelection from '@util/ItemSelection copy';
+import { BonusMap, DefaultWeightMap, getPet, petNameArray, petNames } from '@util/itemMapping';
+
+import { gearTeamSuggestions, mainTeamSuggestions, maxKey, reincTeamSuggestions } from '../pets/teamSuggestions';
+import useMobileViewport from '@util/useMobileViewport';
+import SaveGameData, { PetData } from '@app/SaveGameData';
+import { ScoreSection } from '@app/expeditions/score_section';
+import Decimal from 'break_infinity.js';
 
 ReactGA.initialize([{
-    trackingId: "G-GGLPK02VH8",
-    // gaOptions: {...}, // optional
-    // gtagOptions: {
-    //     send_page_view: false
-    // },
+    trackingId: 'G-GGLPK02VH8',
 }]);
-let groupCache = {};
-function setGroupCache(newCache) {
+
+type PetaDataExtended = PetData & { name?: string };
+type PetDataCache = { [keyString: string]: PetaDataExtended[][] };
+
+let groupCache: PetDataCache = {};
+
+function setGroupCache(newCache: PetDataCache) {
     groupCache = newCache;
 }
 
 const defaultPetSelection = petNameArray.map(petData => petData.petId);
 
-function ScoreSection({ data, group, totalScore, defaultRank }) {
-    const { baseGroupScore, groupScoreMax, dmgCount, timeCount, synergyBonus, groupScore, groupRankScore } = petHelper.calculateGroupScore(group, defaultRank);
-    const score = groupRankScore;
-    // const displayedDamage = (score * 5 * data.PetDamageBonuses).toExponential(2);
-    const displayedDamage = mathHelper.multiplyDecimal(data.petDamageBD, score * 5).toExponential(2);
-    return (
-        <>
-            <ul>
-                {/* <li key="totalScore">
-                    {`True Damage: ${(5 * groupScoreMax * Number(data?.PetDamageBonuses)).toExponential(2)}`}
-                </li> */}
-                <li key="totalScore">
-                    {`Per Rank Damage: ${displayedDamage}`}
-                </li>
-                <li key="baseGroupScore">
-                    Group Base: {Number(baseGroupScore).toExponential(2)}
-                </li>
-                <li key="damageBonus">
-                    Dmg Bonus: {Number(1 + dmgCount * petHelper.EXP_DMG_MOD).toFixed(2)}x
-                </li>
-                <li key="timeBonus">
-                    Time Bonus: {Number(1 + timeCount * petHelper.EXP_TIME_MOD).toFixed(2)}x
-                </li>
-                <li key="synergyBonus">
-                    Synergy: {Number(synergyBonus).toFixed(2)}x
-                </li>
-                <li key="petDamageBonus">
-                    {/* PetDmgMod: {Number(data?.PetDamageBonuses).toExponential(2)} */}
-                    PetDmgMod: {data?.petDamageBD.toExponential(2)}
-                </li>
-            </ul>
-        </>
-    );
-}
-
-
-
-import Head from 'next/head';
-
-
 export default function Expeditions() {
+    useMobileViewport();
 
-
-    const [mobileMode, setMobileMode] = useState(false);
-    useEffect(() => {
-        setMobileMode(isMobile);
-        if (isMobile) {
-            setTimeout(() => {
-                const viewport = document.querySelector('meta[name="viewport"]');
-                if (viewport instanceof HTMLMetaElement) {
-                    viewport.content = "initial-scale=0.1";
-                    viewport.content = "width=1200";
-                }
-            }, 500);
-        }
-    }, []);
-
-
-
-    const [clientData, setData] = useLocalStorage('userData', DefaultSave);
-    const [data, setRunTimeData] = useState(DefaultSave);
+    const [clientData, setData] = useLocalStorage('userData', DefaultSave as SaveGameData);
+    const [data, setRunTimeData] = useState(DefaultSave as SaveGameData & { petDamageBD?: Decimal });
 
     const [petDamageBD, setpetDamageBD] = useState(mathHelper.createDecimal(1));
-    (data as any).petDamageBD = petDamageBD;
+    data.petDamageBD = petDamageBD;
 
-    const [petWhiteList, setPetWhiteListRunTime] = useState([]);
-    const [petWhiteListClient, setPetWhiteList] = useLocalStorage("petWhiteList", []);
+    const [petWhiteList, setPetWhiteListRunTime] = useState([] as PetPlacementData[]);
+    const [petWhiteListClient, setPetWhiteList] = useLocalStorage('petWhiteList', []);
     useEffect(() => {
 
         let petWhiteListClientTemp = [];
@@ -122,8 +66,7 @@ export default function Expeditions() {
         for (const [key, value] of Object.entries(petWhiteListClient)) {
             if (value.placement === 'rel') {
                 foundOld = true;
-            }
-            else {
+            } else {
                 petWhiteListClientTemp.push(value);
             }
         }
@@ -135,11 +78,11 @@ export default function Expeditions() {
 
     const [manualEnabledPetsLoaded, setManualEnabledPetsLoaded] = useState(false);
     const [manualEnabledPets, setManualEnabledPetsRunTime] = useState({});
-    const [manualEnabledPetsClient, setManualEnabledPets] = useLocalStorage("manualEnabledPets", {});
+    const [manualEnabledPetsClient, setManualEnabledPets] = useLocalStorage('manualEnabledPets', {});
     useEffect(() => {
         setManualEnabledPetsLoaded(true);
         setManualEnabledPetsRunTime(manualEnabledPetsClient);
-    }, [manualEnabledPetsClient])
+    }, [manualEnabledPetsClient]);
 
 
     const [clientUsePromos, setUsePromos] = useLocalStorage('usePromos', false);
@@ -167,71 +110,69 @@ export default function Expeditions() {
     }, [clientEqualisePets]);
 
     const [enabledBonusHighlight, setEnabledBonusHighlightRunTime] = useState({});
-    const [enabledBonusHighlightClient, setEnabledBonusHighlight] = useLocalStorage("enabledBonusHighlight", {});
+    const [enabledBonusHighlightClient, setEnabledBonusHighlight] = useLocalStorage('enabledBonusHighlight', {});
     useEffect(() => {
         setEnabledBonusHighlightRunTime(enabledBonusHighlightClient);
     }, [enabledBonusHighlightClient]);
 
     const [showAllBonusTally, setShowAllBonusTallyRunTime] = useState(false);
-    const [showAllBonusTallyClient, setShowAllBonusTally] = useLocalStorage("showAllBonusTally", false);
+    const [showAllBonusTallyClient, setShowAllBonusTally] = useLocalStorage('showAllBonusTally', false);
     useEffect(() => {
         setShowAllBonusTallyRunTime(showAllBonusTallyClient);
     }, [showAllBonusTallyClient]);
 
     const [leftOverBonus1, setLeftOverBonus1RunTime] = useState(1016);
-    const [leftOverBonus1Client, setLeftOverBonus1] = useLocalStorage("leftOverBonus1", 1016);
+    const [leftOverBonus1Client, setLeftOverBonus1] = useLocalStorage('leftOverBonus1', 1016);
     useEffect(() => {
         setLeftOverBonus1RunTime(leftOverBonus1Client);
     }, [leftOverBonus1Client]);
 
     const [hideLocked, setHideLockedRunTime] = useState(false);
-    const [hideLockedClient, setHideLocked] = useLocalStorage("hideLocked", false);
+    const [hideLockedClient, setHideLocked] = useLocalStorage('hideLocked', false);
     useEffect(() => {
         setHideLockedRunTime(hideLockedClient);
     }, [hideLockedClient]);
 
     const [activeCustomBonuses, setActiveCustomBonusesRunTime] = useState([]);
-    const [activeCustomBonusesClient, setActiveCustomBonuses] = useLocalStorage("activeCustomBonuses", []);
+    const [activeCustomBonusesClient, setActiveCustomBonuses] = useLocalStorage('activeCustomBonuses', []);
     useEffect(() => {
         setActiveCustomBonusesRunTime(activeCustomBonusesClient);
     }, [activeCustomBonusesClient]);
 
     const [groupRankCritera, setGroupRankCriteriaRunTime] = useState(1);//1 = overall damage + modifiers, 2 = token/hr + (damage and modifiers), 3 = advanced/custom
-    const [groupRankCriteraClient, setGroupRankCriteria] = useLocalStorage("groupRankCriteria", 1);
+    const [groupRankCriteraClient, setGroupRankCriteria] = useLocalStorage('groupRankCriteria', 1);
     useEffect(() => {
         setGroupRankCriteriaRunTime(groupRankCriteraClient);
     }, [groupRankCriteraClient]);
 
     const [defaultRank, setDefaultRankRunTime] = useState(1);
-    const [defaultRankClient, setDefaultRank] = useLocalStorage("defaultRank", 1);
+    const [defaultRankClient, setDefaultRank] = useLocalStorage('defaultRank', 1);
     useEffect(() => {
         setDefaultRankRunTime(defaultRankClient);
     }, [defaultRankClient]);
 
     const [comboSelector, setComboSelectorRunTime] = useState(1);
-    const [comboSelectorClient, setComboSelector] = useLocalStorage("comboSelector", 1);
+    const [comboSelectorClient, setComboSelector] = useLocalStorage('comboSelector', 1);
     useEffect(() => {
         setComboSelectorRunTime(comboSelectorClient);
     }, [comboSelectorClient]);
 
     const [numTeams, setNumTeamsRunTime] = useState(1);
-    const [numTeamsClient, setNumTeams] = useLocalStorage("numTeams", 1);
+    const [numTeamsClient, setNumTeams] = useLocalStorage('numTeams', 1);
     useEffect(() => {
         setNumTeamsRunTime(numTeamsClient);
     }, [numTeamsClient]);
 
-
     const [groupsCacheRunTime, setGroupsCacheRunTime] = useState({});
-    const [groupsCacheClient, setGroupsCache] = useLocalStorage("groupsCache", {});
+    const [groupsCacheClient, setGroupsCache] = useLocalStorage('groupsCache', {});
     useEffect(() => {
         setGroupsCacheRunTime(groupsCacheClient);
     }, [groupsCacheClient]);
 
-
     const tokenSelections = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
     const [hoveredBonus, setHoveredBonus] = useState(0);
     const [activePet, setActivePet] = useState(-1);
-    const [groups, setGroups] = useState([]);
+    const [groups, setGroups] = useState([] as PetData[][]);
     const [selectedPets, setSelectedPets] = useState([]);
     const [failedFilters, setFailedFilters] = useState([]);
     const [originalPets, setOriginalPets] = useState([]);
@@ -248,14 +189,13 @@ export default function Expeditions() {
         let recalculate = true;
 
         setRefreshGroups(false);
-        console.log(`handle groups called`)
+        console.log(`handle groups called`);
         const petData = data?.PetsCollection || [];
         if (petData.length === 0) return null;
-        const selectedItemsById = petData.reduce((accum, item) => {
+        const selectedItemsById = petData.reduce((accum: {[petId: number]: PetData }, item) => {
             accum[parseInt(item.ID as any, 10)] = item;
             return accum;
-        }, {})
-
+        }, {});
 
         const localPets = selectedItems.filter((e) => e < 9999).map(petId => selectedItemsById[petId]);
         const keyString = selectedItems.sort().join(',');
@@ -279,13 +219,14 @@ export default function Expeditions() {
                     equalisePets: equalisePets,
                 }
             );
-            setGroupCache({ ...groupCache, [keyString]: groups })
+            setGroupCache({ ...groupCache, [keyString]: groups });
             setGroups(groups);
             let groupCacheMap = {};
+
             groups.forEach((inner_group) => {
                 inner_group.forEach((group_pet) => {
 
-                    let finalPet = JSON.parse(JSON.stringify(group_pet));
+                    let finalPet: PetaDataExtended = JSON.parse(JSON.stringify(group_pet));
                     finalPet.name = petNames[finalPet.ID] ? petNames[finalPet.ID].name : petNames[9999].name;
                     groupCacheMap[group_pet.ID] = finalPet;
 
@@ -299,8 +240,6 @@ export default function Expeditions() {
     const dataLoaded = useRef(false);
 
     useEffect(() => {
-
-
         if (dataLoaded.current === false && manualEnabledPetsLoaded) {
 
             dataLoaded.current = true;
@@ -343,7 +282,7 @@ export default function Expeditions() {
                     }
                     return false;
                     // return isValidRank && isValidLocked;
-                }
+                },
             ).map((pet) => pet.ID);
             setSelectedItems(positiveRankedPets);
             setOriginalPets(origPets);
@@ -357,8 +296,8 @@ export default function Expeditions() {
 
 
     useEffect(() => {
-        setRefreshGroups(true)
-    }, [defaultRank, comboSelector, groupRankCritera, numTeams, tokenDamageBias, activeCustomBonuses,])
+        setRefreshGroups(true);
+    }, [defaultRank, comboSelector, groupRankCritera, numTeams, tokenDamageBias, activeCustomBonuses]);
 
 
     let whiteListAlertText = '';
@@ -377,7 +316,7 @@ export default function Expeditions() {
         1013: 0, //dungeon damage
         1014: 0, //card exp
         1015: 0, //reinc pts gain
-        1016: 0 // token gain
+        1016: 0, // token gain
     };
     let bonusPets = {};
     let totalMessages = [];
@@ -404,16 +343,14 @@ export default function Expeditions() {
         }
         if (inner_pet.Type === 1) {
             numGround++;
-        }
-        else {
+        } else {
             numAir++;
         }
 
         // used to show which group it got sorted into
         if (cur.placement === `auto`) {
             relWhiteListMap[cur.id] = { ...cur };
-        }
-        else if (cur.placement === 'team') {
+        } else if (cur.placement === 'team') {
 
             if (!manualGroups[cur.parameters.team]) {
                 manualGroups[cur.parameters.team] = [];
@@ -430,15 +367,13 @@ export default function Expeditions() {
                 manualGroups[cur.parameters.team].forEach((manual_pet) => {
                     if (manual_pet.Type === 1) {
                         groundy++;
-                    }
-                    else {
+                    } else {
                         airy++;
                     }
                 });
                 if (airy > (maxPets / 2)) {
                     whiteListAlertText = `Group ${cur.parameters.team} has too many air pets!`;
-                }
-                else if (airy > (maxPets / 2)) {
+                } else if (airy > (maxPets / 2)) {
                     whiteListAlertText = `Group ${cur.parameters.team} has too many ground pets!`;
                 }
             }
@@ -448,8 +383,7 @@ export default function Expeditions() {
     if (whiteListAlertText.length === 0) {
         if (numAir > maxType) {
             whiteListAlertText = `There are too many air pets!`;
-        }
-        else if (numGround > maxType) {
+        } else if (numGround > maxType) {
             whiteListAlertText = `There are too many ground pets!`;
         }
     }
@@ -473,8 +407,8 @@ export default function Expeditions() {
 
                 pet.BonusList.forEach((bon) => {
                     if (bon.ID in bonusTotals) bonusTotals[bon.ID]++;
-                })
-            })
+                });
+            });
 
 
             const groupBests = petHelper.calculateBestHours(
@@ -484,30 +418,33 @@ export default function Expeditions() {
                     clover: data.SoulGoldenClover,
                     residueToken: data.CowShopExpeditionToken,
                     data: data,
-                    finalTokenBonus: finalTokenBonus
+                    finalTokenBonus: finalTokenBonus,
                 },
-                comboSelector
+                comboSelector,
             )[tokenSelections[index]];
             // totalTokensHR += groupBests.tokenHR;
             // totalTokensHR += groupBests.totalTokens / groupBests.hours;
             totalTokensHR += groupBests.tokenHR / groupBests.hours;
-        })
+        });
 
     if (selectedPets) {
         for (let i = 0; i < selectedPets.length; i++) {
             selectedPets[i].BonusList.forEach((bonus) => {
                 if (!bonusPets[bonus.ID]) {
-                    bonusPets[bonus.ID] = { total: 0, pets: [] }
+                    bonusPets[bonus.ID] = { total: 0, pets: [] };
                 }
                 bonusPets[bonus.ID].total++;
-                bonusPets[bonus.ID].pets.push(selectedPets[i])
-            })
+                bonusPets[bonus.ID].pets.push(selectedPets[i]);
+            });
         }
     }
 
     for (const [key, value] of Object.entries(bonusTotals)) {
         if (activeCustomBonuses.find((a) => a.id === Number(key)) || showAllBonusTally)
-            totalMessages.push({ text: `${BonusMap[key].label}: ${value}/${bonusPets[key] ? bonusPets[key].total : 0} pets`, bonus: key })
+            totalMessages.push({
+                text: `${BonusMap[key].label}: ${value}/${bonusPets[key] ? bonusPets[key].total : 0} pets`,
+                bonus: key,
+            });
     }
 
 
@@ -518,8 +455,7 @@ export default function Expeditions() {
 
                 //Awful way to do it, but need to check we haven't already added pet to table
                 found = petWhiteList.find((a) => a.id === pet.ID);
-            }
-            catch (err) {
+            } catch (err) {
                 console.log(err);
             }
 
@@ -532,9 +468,9 @@ export default function Expeditions() {
                 return;
             }
             if (pet.ID > 0)
-                filterablePets.push({ id: pet.ID, label: getPet(pet.ID).name })
+                filterablePets.push({ id: pet.ID, label: getPet(pet.ID).name });
 
-        })
+        });
     }
 
     const leftOverIgnore = {
@@ -556,7 +492,7 @@ export default function Expeditions() {
         //18: true,//Pet Dmg
         //18: true,//Pet Dmg
         18: true,//Pet Dmg
-    }
+    };
     let leftOver1Pets = [];
 
     selectedPets.map((e, index) => {
@@ -583,7 +519,7 @@ export default function Expeditions() {
         let enabledPets = {};
 
         for (let i = 0; i < items.length; i++) {
-            localPets.push(petData[items[i]])
+            localPets.push(petData[items[i]]);
             enabledPets[items[i]] = 1;
         }
 
@@ -620,14 +556,14 @@ export default function Expeditions() {
         }
     };
 
-    leftOver1Pets = leftOver1Pets.sort((a, b) => petHelper.calculatePetBaseDamage(b, defaultRank) - petHelper.calculatePetBaseDamage(a, defaultRank))
+    leftOver1Pets = leftOver1Pets.sort((a, b) => petHelper.calculatePetBaseDamage(b, defaultRank) - petHelper.calculatePetBaseDamage(a, defaultRank));
 
     let bonusesWithPets = {};
     data.PetsCollection.forEach((bonus_pet) => {
         bonus_pet.BonusList.forEach((pet_bonus_inner) => {
             bonusesWithPets[pet_bonus_inner.ID] = bonus_pet;
-        })
-    })
+        });
+    });
 
     let filterableBonuses = Object.values(BonusMap)
         .filter((e) => !!e && !leftOverIgnore[e.id] && !!bonusesWithPets[e.id])
@@ -639,7 +575,7 @@ export default function Expeditions() {
                 }
                 return inner_e;
             }
-        })
+        });
 
 
     let unlockedPetsMap = {};
@@ -648,8 +584,8 @@ export default function Expeditions() {
         (pet) => {
             const isValidLocked = !!pet.Locked;
             return isValidLocked;
-        }
-    )
+        },
+    );
 
     for (let i = 0; i < positiveRankedPets.length; i++) {
         let cur = positiveRankedPets[i];
@@ -665,14 +601,14 @@ export default function Expeditions() {
                 width: 'calc(100% - 0px)',
                 background: 'black',
                 display: 'flex',
-                overflow: 'auto'
+                overflow: 'auto',
             }}
         >
 
             {/* <GoogleAdSense publisherId="pub-1393057374484862" /> */}
             {/* Grid Left */}
             <div
-                className='importantText'
+                className="importantText"
                 style={{
                     height: 'calc(100vh - 52px)',
                     border: '2px solid rgba(255,255,255,0.8)',
@@ -683,7 +619,7 @@ export default function Expeditions() {
                     borderRadius: '6px',
                     width: '33%',
                     minWidth: '283px',
-                    maxWidth: '590px'
+                    maxWidth: '590px',
                 }}
             >
                 <div
@@ -697,12 +633,15 @@ export default function Expeditions() {
                 >
 
                     {/* Title header */}
-                    <div style={{ backgroundColor: 'rgba(255,255,255, 0.12)', }}>
+                    <div style={{ backgroundColor: 'rgba(255,255,255, 0.12)' }}>
 
                         <div
                             style={{
-                                fontSize: '32px', fontWeight: 'bold', width: '100%', borderBottom: '0px solid rgba(255,255,255,0.8)',
-                                textAlign: 'center'
+                                fontSize: '32px',
+                                fontWeight: 'bold',
+                                width: '100%',
+                                borderBottom: '0px solid rgba(255,255,255,0.8)',
+                                textAlign: 'center',
                             }}>
                             Best Teams
                         </div>
@@ -711,7 +650,7 @@ export default function Expeditions() {
                             // fontWeight: 'bold',
                             borderTop: '2px solid rgba(255,255,255,0.8)',
                             borderBottom: '2px solid rgba(255,255,255,0.8)',
-                            textAlign: 'center'
+                            textAlign: 'center',
                         }}>
                             <div style={{ width: '50%', borderRight: '2px solid rgba(255,255,255,0.8)' }}>
                                 {`Total Damage: ${damageTotal.toExponential(3)}`}
@@ -726,10 +665,9 @@ export default function Expeditions() {
                     {/* <div id='in_content_flex' style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', }} /> */}
 
 
-
                     <div style={{ overflow: 'auto' }}>
 
-                        {groups.reduce((accum, group, index) => {
+                        {groups.reduce((accum: ReactNode[], group, index) => {
                             let groupLabel = ``;
 
                             const groupTotal = petHelper.calculateGroupScore(group, defaultRank);
@@ -738,8 +676,8 @@ export default function Expeditions() {
                             // tokenScore = tokenScore.toExponential(3);
                             let tempTokenScore = petHelper.calculateBestHours(group, null, {
                                 clover: data.SoulGoldenClover, residueToken: data.CowShopExpeditionToken, data: data,
-                                finalTokenBonus: finalTokenBonus
-                            }, comboSelector)[tokenSelections[index]]
+                                finalTokenBonus: finalTokenBonus,
+                            }, comboSelector)[tokenSelections[index]];
                             let tokenScore = (tempTokenScore.tokenHR / tempTokenScore.hours).toExponential(3);
                             const score = groupTotal.groupScore;
                             // const displayedDamage = (score * 5 * data.PetDamageBonuses).toExponential(2);
@@ -757,33 +695,39 @@ export default function Expeditions() {
                                 case 1://damage
                                     groupLabel = `Group ${index + 1}`;
                                     // groupLabelDamage = `Damage: ${displayedDamage}`
-                                    groupRankDamage = `Rank Dmg: ${displayedDamage}`
-                                    groupLabelDamage = `Game Dmg: ${trueDamage}`
-                                    groupLabelToken = `Token/hr: ${tokenScore}`
+                                    groupRankDamage = `Rank Dmg: ${displayedDamage}`;
+                                    groupLabelDamage = `Game Dmg: ${trueDamage}`;
+                                    groupLabelToken = `Token/hr: ${tokenScore}`;
                                     tokenInfo = petHelper.calculateBestHours(group, null, {
-                                        clover: data.SoulGoldenClover, residueToken: data.CowShopExpeditionToken, data: data,
-                                        finalTokenBonus: finalTokenBonus
+                                        clover: data.SoulGoldenClover,
+                                        residueToken: data.CowShopExpeditionToken,
+                                        data: data,
+                                        finalTokenBonus: finalTokenBonus,
                                     }, comboSelector);
 
                                     break;
                                 case 2://token
                                     groupLabel = `Group ${index + 1}`;
                                     // groupLabelDamage = `Damage: ${displayedDamage}`
-                                    groupLabelDamage = `Damage: ${trueDamage}`
-                                    groupLabelToken = `Token/hr: ${tokenScore}`
+                                    groupLabelDamage = `Damage: ${trueDamage}`;
+                                    groupLabelToken = `Token/hr: ${tokenScore}`;
                                     tokenInfo = petHelper.calculateBestHours(group, null, {
-                                        clover: data.SoulGoldenClover, residueToken: data.CowShopExpeditionToken, data: data,
-                                        finalTokenBonus: finalTokenBonus
+                                        clover: data.SoulGoldenClover,
+                                        residueToken: data.CowShopExpeditionToken,
+                                        data: data,
+                                        finalTokenBonus: finalTokenBonus,
                                     }, comboSelector);
                                     break;
                                 case 3://Advanced
                                     groupLabel = `Group ${index + 1}`;
                                     // groupLabelDamage = `Damage: ${displayedDamage}`
-                                    groupLabelDamage = `Damage: ${trueDamage}`
-                                    groupLabelToken = `Token/hr: ${tokenScore}`
+                                    groupLabelDamage = `Damage: ${trueDamage}`;
+                                    groupLabelToken = `Token/hr: ${tokenScore}`;
                                     tokenInfo = petHelper.calculateBestHours(group, null, {
-                                        clover: data.SoulGoldenClover, residueToken: data.CowShopExpeditionToken, data: data,
-                                        finalTokenBonus: finalTokenBonus
+                                        clover: data.SoulGoldenClover,
+                                        residueToken: data.CowShopExpeditionToken,
+                                        data: data,
+                                        finalTokenBonus: finalTokenBonus,
                                     }, comboSelector);
                                     break;
                                 default:
@@ -797,7 +741,8 @@ export default function Expeditions() {
                                 <div className="groups-tooltip">
                                     <span className="groups-tooltip-content">
                                         <h3>Group Score ({totalScore})</h3>
-                                        <ScoreSection data={data} group={group} totalScore={totalScore} defaultRank={defaultRank} />
+                                        <ScoreSection data={data} group={group} totalScore={totalScore}
+                                                      defaultRank={defaultRank}/>
                                     </span>
                                 </div>
                             );
@@ -810,16 +755,32 @@ export default function Expeditions() {
                                 }}
                             >
                                 <div
-                                    style={{ display: 'flex', width: '100%', borderBottom: '1px solid rgba(255,255,255,0.8)' }}
+                                    style={{
+                                        display: 'flex',
+                                        width: '100%',
+                                        borderBottom: '1px solid rgba(255,255,255,0.8)',
+                                    }}
                                 >
                                     <div
-                                        style={{ borderRight: '1px solid rgba(255,255,255,0.8)', width: '33%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        style={{
+                                            borderRight: '1px solid rgba(255,255,255,0.8)',
+                                            width: '33%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}>
                                         {groupRankDamage}
                                     </div>
 
 
                                     <div
-                                        style={{ width: '33%', borderRight: '1px solid rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                        style={{
+                                            width: '33%',
+                                            borderRight: '1px solid rgba(255,255,255,0.8)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
                                     >
                                         <div style={{ margin: '0 12px' }}>
 
@@ -827,14 +788,20 @@ export default function Expeditions() {
                                         </div>
                                     </div>
                                     <div
-                                        style={{ width: '33%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px 0' }}
+                                        style={{
+                                            width: '33%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            margin: '2px 0',
+                                        }}
                                     >
                                         <div style={{ margin: '0 12px' }}>
                                             {groupLabelToken}
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                            </div>;
 
 
                             let GroupIcons =
@@ -867,7 +834,7 @@ export default function Expeditions() {
                                                     width: 'calc(25% - 3px)',
                                                     height: 'auto',
                                                     alignItems: 'center',
-                                                    justifyContent: 'center'
+                                                    justifyContent: 'center',
                                                 }}
                                             >
                                                 <PetItemCoin
@@ -875,10 +842,11 @@ export default function Expeditions() {
                                                     fullPetData={petData}
                                                     data={data}
                                                     isSelected={true}
-                                                    onClick={() => { }}
+                                                    onClick={() => {
+                                                    }}
                                                     weightMap={weightMap}
                                                     defaultRank={defaultRank}
-                                                    borderActive={petData.BonusList.find((a) => a.ID === hoveredBonus) || ID === activePet}
+                                                    borderActive={!!petData.BonusList.find((a) => a.ID === hoveredBonus) || ID === activePet}
                                                     enabledBonusHighlight={enabledBonusHighlight}
                                                 />
                                                 <div
@@ -893,25 +861,35 @@ export default function Expeditions() {
 
                                                             let pet_inner = temp.find((sample_pet) => sample_pet.id === petData.ID);
                                                             if (!pet_inner) {
-                                                                temp.push({ label: staticPetData.name, id: staticPetData.petId, placement: 'team', parameters: { team: index, damageBias: 17 }, pet: petData });
-                                                            }
-                                                            else {
+                                                                temp.push({
+                                                                    label: staticPetData.name,
+                                                                    id: staticPetData.petId,
+                                                                    placement: 'team',
+                                                                    parameters: { team: index, damageBias: 17 },
+                                                                    pet: petData,
+                                                                });
+                                                            } else {
                                                                 pet_inner.placement = 'team';
                                                                 pet_inner.parameters = { team: index };
                                                                 pet_inner.pet = petData;
                                                             }
                                                             return temp;
-                                                        })
+                                                        });
 
                                                         setRefreshGroups(true);
                                                         return;
                                                     }}
                                                 >
-                                                    <div style={{ width: '20px', height: '20px', position: 'relative', zIndex: '2' }} >
+                                                    <div style={{
+                                                        width: '20px',
+                                                        height: '20px',
+                                                        position: 'relative',
+                                                        zIndex: '2',
+                                                    }}>
                                                         <Image
                                                             fill
                                                             src={pinIcon}
-                                                            alt='push pin'
+                                                            alt="push pin"
                                                         />
                                                     </div>
                                                     {/* <img
@@ -937,27 +915,31 @@ export default function Expeditions() {
                                                                     id: staticPetData.petId,
                                                                     placement: 'blacklist',
                                                                     parameters: { team: 0, damageBias: 17 },
-                                                                    pet: petData
+                                                                    pet: petData,
                                                                 });
-                                                            }
-                                                            else {
+                                                            } else {
                                                                 pet_inner.placement = 'blacklist';
-                                                                pet_inner.parameters = { team: 0 }
+                                                                pet_inner.parameters = { team: 0 };
                                                                 pet_inner.pet = petData;
                                                             }
 
                                                             return temp;
-                                                        })
+                                                        });
 
                                                         setRefreshGroups(true);
                                                         return;
 
                                                     }}
                                                 >
-                                                    <div style={{ width: '20px', height: '20px', position: 'relative', zIndex: '2' }} >
+                                                    <div style={{
+                                                        width: '20px',
+                                                        height: '20px',
+                                                        position: 'relative',
+                                                        zIndex: '2',
+                                                    }}>
                                                         <Image
                                                             src={trashIcon}
-                                                            alt='trash can'
+                                                            alt="trash can"
                                                             fill
                                                         />
                                                     </div>
@@ -969,7 +951,7 @@ export default function Expeditions() {
 
                                         );
                                     })}
-                                </div>
+                                </div>;
 
                             let finalRow = <div
                                 key={'group' + index}
@@ -984,16 +966,31 @@ export default function Expeditions() {
                                     border: '1px solid rgba(255,255,255,0.8)',
                                 }}>
                                 <div
-                                    style={{ display: 'flex', backgroundColor: 'rgba(255,255,255, 0.12)', borderRight: `1px solid rgba(255,255,255,0.8)` }}
+                                    style={{
+                                        display: 'flex',
+                                        backgroundColor: 'rgba(255,255,255, 0.12)',
+                                        borderRight: `1px solid rgba(255,255,255,0.8)`,
+                                    }}
                                 >
                                     <MouseOverPopover tooltip={groupTooltip} extraClasses={`maxHeight`}>
                                         <div
-                                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 2px' }}
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                padding: '0 2px',
+                                            }}
                                         >
                                             <div style={{ fontSize: '20px' }}>
                                                 {index + 1}
                                             </div>
-                                            <div style={{ height: '18px', width: '18px', margin: '0 0 0 0', position: 'relative' }} >
+                                            <div style={{
+                                                height: '18px',
+                                                width: '18px',
+                                                margin: '0 0 0 0',
+                                                position: 'relative',
+                                            }}>
                                                 <Image
                                                     fill
                                                     src={infoIcon}
@@ -1010,7 +1007,7 @@ export default function Expeditions() {
                                     {GroupTitle}
                                     {GroupIcons}
                                 </div>
-                            </div>
+                            </div>;
                             accum.push(finalRow);
 
                             return accum;
@@ -1021,7 +1018,7 @@ export default function Expeditions() {
 
             {/* Grid Center */}
             <div
-                className='importantText'
+                className="importantText"
                 style={{
                     border: '2px solid rgba(255,255,255,0.8)',
                     margin: '6px 12px 6px 6px',
@@ -1036,30 +1033,43 @@ export default function Expeditions() {
 
                 {/* Header */}
                 <div style={{
-                    display: 'flex', width: '100%', borderBottom: '2px solid  rgba(255,255,255,0.8)', justifyContent: 'center',
+                    display: 'flex',
+                    width: '100%',
+                    borderBottom: '2px solid  rgba(255,255,255,0.8)',
+                    justifyContent: 'center',
                     backgroundColor: 'rgba(255,255,255, 0.12)',
                 }}>
 
-                    <div style={{ fontSize: '32px', fontWeight: 'bold', }}>
+                    <div style={{ fontSize: '32px', fontWeight: 'bold' }}>
                         Configuration
                     </div>
-                    <div style={{ height: '30px', alignSelf: 'center', marginLeft: '12px' }} >
+                    <div style={{ height: '30px', alignSelf: 'center', marginLeft: '12px' }}>
                         <MouseOverPopover
                             opacity={1}
                             tooltip={
                                 <div>
                                     {/* <img alt='screenshot of game text explaining how pet ranks work' src={rankExplain} style={{ height: '50px' }} /> */}
-                                    <Image alt='screenshot of game text explaining how pet ranks work' src={rankExplain} style={{ height: '50px' }} />
+                                    <Image alt="screenshot of game text explaining how pet ranks work" src={rankExplain}
+                                           style={{ height: '50px' }}/>
                                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                                        <div style={{ fontWeight: 'bold', fontSize: '24px', minWidth: "90px" }}>Explanation/How To Use: </div>
+                                        <div style={{
+                                            fontWeight: 'bold',
+                                            fontSize: '24px',
+                                            minWidth: '90px',
+                                        }}>Explanation/How To Use:
+                                        </div>
                                         <div style={{ marginLeft: '12px', maxWidth: '724px' }}>
-                                            Whitelist (make sure they are on an expedition team) any important pets (such as those that have item rating, reincarnation exp, residue) or ones that you have equipped
-                                            often. The expedition ranks will make those pets level faster and give bigger bonuses when actively equipped </div>
+                                            Whitelist (make sure they are on an expedition team) any important pets
+                                            (such as those that have item rating, reincarnation exp, residue) or ones
+                                            that you have equipped
+                                            often. The expedition ranks will make those pets level faster and give
+                                            bigger bonuses when actively equipped
+                                        </div>
                                     </div>
                                 </div>
                             }
                         >
-                            <div style={{ height: '30px', width: '30px', position: 'relative' }} >
+                            <div style={{ height: '30px', width: '30px', position: 'relative' }}>
 
                                 <Image
                                     alt='Letter "I" inside a circle, shows more information on hover'
@@ -1075,7 +1085,12 @@ export default function Expeditions() {
 
                 {/* Info Configs */}
                 <div
-                    style={{ padding: '6px 3px 1px 3px', overflow: 'auto', maxHeight: 'calc(100% - 45px)', overflowAnchor: 'none' }}
+                    style={{
+                        padding: '6px 3px 1px 3px',
+                        overflow: 'auto',
+                        maxHeight: 'calc(100% - 45px)',
+                        overflowAnchor: 'none',
+                    }}
                 >
                     <div style={{
                         display: 'flex',
@@ -1083,7 +1098,7 @@ export default function Expeditions() {
                         backgroundColor: 'rgba(255,255,255, 0.05)',
                         margin: '6px 6px',
                         padding: '6px',
-                        border: '1px solid rgba(255,255,255,0.8)', overflowAnchor: 'none'
+                        border: '1px solid rgba(255,255,255,0.8)', overflowAnchor: 'none',
                     }}>
 
                         <div style={{ marginRight: 'auto' }}>
@@ -1091,10 +1106,10 @@ export default function Expeditions() {
 
                                 <div>{`Ignore Pets Rank`}</div>
                                 <input
-                                    aria-label='Force pets to rank 1'
+                                    aria-label="Force pets to rank 1"
                                     type="checkbox"
                                     onChange={(e) => {
-                                        setDefaultRank(e.target.checked ? 1 : 0)
+                                        setDefaultRank(e.target.checked ? 1 : 0);
                                     }}
                                     checked={!!defaultRank}
                                     value={!!defaultRank as any}
@@ -1117,39 +1132,47 @@ export default function Expeditions() {
                                     </div>
                                 </MouseOverPopover>
                                 <select
-                                    className='importantText'
+                                    className="importantText"
                                     style={{ maxWidth: '144px', backgroundColor: '#171717', borderRadius: '4px' }}
-                                    aria-label='Specify desired combo bonus'
+                                    aria-label="Specify desired combo bonus"
                                     // disabled={refreshGroups}
                                     onChange={
                                         (e) => {
-                                            setComboSelector(Number(e.target.value))
+                                            setComboSelector(Number(e.target.value));
                                         }
                                     }
                                     // defaultValue={comboSelector + ''}
                                     value={comboSelector + ''}
                                 >
                                     <option
-                                        value="1">1.0</option>
+                                        value="1">1.0
+                                    </option>
                                     <option
-                                        value="1.1">1.1</option>
+                                        value="1.1">1.1
+                                    </option>
                                     <option
-                                        value="1.2">1.2</option>
+                                        value="1.2">1.2
+                                    </option>
                                 </select>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center' }} >
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
                                 <div
                                     style={{
-                                        marginRight: '12px'
+                                        marginRight: '12px',
                                     }}>
                                     Number of teams:
                                 </div>
                                 <input
-                                    id='prepFormInput'
-                                    className='importantText'
-                                    style={{ maxWidth: '144px', backgroundColor: '#171717', borderRadius: '4px', fontSize: '14px' }}
-                                    aria-label='Number of teams to calculate'
-                                    type='number'
+                                    id="prepFormInput"
+                                    className="importantText"
+                                    style={{
+                                        maxWidth: '144px',
+                                        backgroundColor: '#171717',
+                                        borderRadius: '4px',
+                                        fontSize: '14px',
+                                    }}
+                                    aria-label="Number of teams to calculate"
+                                    type="number"
                                     value={numTeams}
                                     onChange={
                                         (e) => {
@@ -1160,8 +1183,7 @@ export default function Expeditions() {
                                                     return;
                                                 }
                                                 setNumTeams(e.target.value as any);
-                                            }
-                                            catch (err) {
+                                            } catch (err) {
                                                 console.log(err);
                                             }
                                             // console.log(`pressed: ${e.target.value}`)
@@ -1178,15 +1200,16 @@ export default function Expeditions() {
 
                                     <div>{`Show all bonus totals`}</div>
                                     <input
-                                        aria-label='Displays bonuses whose backgrounds can be coloured in'
+                                        aria-label="Displays bonuses whose backgrounds can be coloured in"
                                         // disabled={refreshGroups}
                                         type="checkbox" onChange={(e) => {
-                                            setShowAllBonusTally(e.target.checked ? true : false)
-                                        }} />
+                                        setShowAllBonusTally(e.target.checked ? true : false);
+                                    }}/>
                                 </div>
                             )}
                         </div>
-                        <div id='in_content_flex' style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', }} />
+                        <div id="in_content_flex"
+                             style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}/>
                     </div>
 
                     {/* Card to toggle bonuses */}
@@ -1202,7 +1225,7 @@ export default function Expeditions() {
                                 style={{
                                     margin: '6px 0 6px 0',
                                     display: 'flex',
-                                    flexDirection: 'column'
+                                    flexDirection: 'column',
                                 }}>
                                 {totalMessages.map((e, index) => {
                                     if (index % 2 !== 0 && index > 0) return;
@@ -1214,7 +1237,7 @@ export default function Expeditions() {
                                     let secondFailMsg = secondDmgBias ? failedFilters[totalMessages[index + 1].bonus] : null;
 
                                     if (firstFailMsg) {
-                                        console.log(`aaa`)
+                                        console.log(`aaa`);
                                     }
 
                                     activeCustomBonuses.forEach((active_bon) => {
@@ -1224,20 +1247,20 @@ export default function Expeditions() {
                                             firstDmgBias = <div
                                                 style={{
                                                     // margin: '6px 0 6px 0',
-                                                    display: 'flex'
+                                                    display: 'flex',
                                                 }}
                                             >
                                                 <div
                                                     style={{
-                                                        marginRight: '12px'
+                                                        marginRight: '12px',
                                                     }}
                                                 >
                                                     {`damage bias`}
                                                 </div>
                                                 <input
-                                                    aria-label='Damage bias to control when a pet should be put in'
-                                                    type='number'
-                                                    className='prepNumber'
+                                                    aria-label="Damage bias to control when a pet should be put in"
+                                                    type="number"
+                                                    className="prepNumber"
                                                     value={active_bon.relThresh}
                                                     onChange={
                                                         (num) => {
@@ -1246,16 +1269,16 @@ export default function Expeditions() {
                                                                 x = Math.floor(x);
                                                                 if (x < 0 || x > 100) {
                                                                     return;
-                                                                };
+                                                                }
+
 
                                                                 setActiveCustomBonuses((bonuses) => {
                                                                     let newBonuses = [...bonuses];
                                                                     let bonus = newBonuses.find((a) => a.id === active_bon.id);
                                                                     bonus.relThresh = x;
                                                                     return newBonuses;
-                                                                })
-                                                            }
-                                                            catch (err) {
+                                                                });
+                                                            } catch (err) {
                                                                 console.log(err);
                                                             }
                                                         }}
@@ -1263,26 +1286,26 @@ export default function Expeditions() {
                                                     min="0"
                                                     max="100"
                                                 />
-                                            </div>
+                                            </div>;
                                         }
                                         if (active_bon.id === secondDmgBias) {
                                             secondDmgBias = <div
                                                 style={{
                                                     // margin: '6px 0 6px 0',
-                                                    display: 'flex'
+                                                    display: 'flex',
                                                 }}
                                             >
                                                 <div
                                                     style={{
-                                                        marginRight: '12px'
+                                                        marginRight: '12px',
                                                     }}
                                                 >
                                                     {`damage bias`}
                                                 </div>
                                                 <input
-                                                    aria-label='Damage bias to control when a pet should be put in'
-                                                    type='number'
-                                                    className='prepNumber'
+                                                    aria-label="Damage bias to control when a pet should be put in"
+                                                    type="number"
+                                                    className="prepNumber"
                                                     value={active_bon.relThresh}
                                                     onChange={
                                                         (num) => {
@@ -1291,16 +1314,16 @@ export default function Expeditions() {
                                                                 x = Math.floor(x);
                                                                 if (x < 0 || x > 100) {
                                                                     return;
-                                                                };
+                                                                }
+
 
                                                                 setActiveCustomBonuses((bonuses) => {
                                                                     let newBonuses = [...bonuses];
                                                                     let bonus = newBonuses.find((a) => a.id === active_bon.id);
                                                                     bonus.relThresh = x;
                                                                     return newBonuses;
-                                                                })
-                                                            }
-                                                            catch (err) {
+                                                                });
+                                                            } catch (err) {
                                                                 console.log(err);
                                                             }
                                                         }}
@@ -1308,20 +1331,20 @@ export default function Expeditions() {
                                                     min="0"
                                                     max="100"
                                                 />
-                                            </div>
+                                            </div>;
                                         }
-                                    })
+                                    });
 
                                     return (
                                         <div
                                             key={e.bonus}
                                             style={{
-                                                display: 'flex'
+                                                display: 'flex',
                                             }}
                                         >
                                             <div
                                                 style={{
-                                                    width: '50%'
+                                                    width: '50%',
                                                 }}
                                             >
                                                 <div
@@ -1330,7 +1353,7 @@ export default function Expeditions() {
                                                         // color: helper.bonusColorMap[e.bonus].color
                                                     }}
                                                     onMouseEnter={(e_inner) => {
-                                                        setHoveredBonus(Number(e.bonus))
+                                                        setHoveredBonus(Number(e.bonus));
                                                     }}
                                                     onMouseLeave={(e_inner) => {
                                                         setHoveredBonus(-1);
@@ -1345,14 +1368,17 @@ export default function Expeditions() {
                                                                 aria-label={`Enables the highlight for this bonus`}
                                                                 type="checkbox"
                                                                 onChange={(e_inner) => {
-                                                                    setEnabledBonusHighlight({ ...enabledBonusHighlight, [e.bonus]: e_inner.target.checked ? 1 : 0 })
+                                                                    setEnabledBonusHighlight({
+                                                                        ...enabledBonusHighlight,
+                                                                        [e.bonus]: e_inner.target.checked ? 1 : 0,
+                                                                    });
                                                                 }}
                                                                 checked={enabledBonusHighlight[e.bonus]}
                                                             />
                                                             <div
                                                                 style={{
                                                                     width: '24px',
-                                                                    background: helper.bonusColorMap[e.bonus].color
+                                                                    background: helper.bonusColorMap[e.bonus].color,
                                                                 }}
                                                             />
                                                         </div>
@@ -1367,16 +1393,18 @@ export default function Expeditions() {
                                                                         How aggressively to slot in these pets
                                                                     </div>
                                                                     <div>
-                                                                        Higher value means these pets need to be stronger to considered, lower means smaller threshold to slot them in
+                                                                        Higher value means these pets need to be
+                                                                        stronger to considered, lower means smaller
+                                                                        threshold to slot them in
                                                                     </div>
                                                                     <div>
-                                                                        This is based on the best team at each step without these pets, vs with it.
+                                                                        This is based on the best team at each step
+                                                                        without these pets, vs with it.
                                                                     </div>
                                                                 </div>
                                                             }>
                                                                 {firstDmgBias}
                                                             </MouseOverPopover>
-
 
 
                                                         }
@@ -1394,7 +1422,7 @@ export default function Expeditions() {
                                                 <div
                                                     key={totalMessages[index + 1].bonus}
                                                     style={{
-                                                        width: '50%'
+                                                        width: '50%',
                                                     }}
                                                 >
                                                     <div
@@ -1402,7 +1430,7 @@ export default function Expeditions() {
                                                             // margin: '6px 0 6px 0'
                                                         }}
                                                         onMouseEnter={(e_inner) => {
-                                                            setHoveredBonus(Number(totalMessages[index + 1].bonus))
+                                                            setHoveredBonus(Number(totalMessages[index + 1].bonus));
                                                         }}
                                                         onMouseLeave={(e_inner) => {
                                                             setHoveredBonus(-1);
@@ -1413,22 +1441,25 @@ export default function Expeditions() {
                                                             <div style={{ display: 'flex' }}>
                                                                 <div>{`Enable highlight`}</div>
                                                                 <input
-                                                                    aria-label='Enables highlighting of pets with this bonus'
+                                                                    aria-label="Enables highlighting of pets with this bonus"
                                                                     type="checkbox"
                                                                     onChange={(e_inner) => {
-                                                                        setEnabledBonusHighlight({ ...enabledBonusHighlight, [totalMessages[index + 1].bonus]: e_inner.target.checked ? 1 : 0 })
+                                                                        setEnabledBonusHighlight({
+                                                                            ...enabledBonusHighlight,
+                                                                            [totalMessages[index + 1].bonus]: e_inner.target.checked ? 1 : 0,
+                                                                        });
                                                                     }}
                                                                     checked={enabledBonusHighlight[totalMessages[index + 1].bonus]}
                                                                 />
                                                                 <div
                                                                     style={{
                                                                         width: '24px',
-                                                                        background: helper.bonusColorMap[totalMessages[index + 1].bonus].color
+                                                                        background: helper.bonusColorMap[totalMessages[index + 1].bonus].color,
                                                                     }}
                                                                 />
                                                             </div>
                                                         </div>
-                                                        <div className='dmgBias'>
+                                                        <div className="dmgBias">
 
                                                             {isNaN(secondDmgBias) && secondDmgBias}
                                                         </div>
@@ -1442,7 +1473,7 @@ export default function Expeditions() {
                                                 </div>
                                             )}
                                         </div>
-                                    )
+                                    );
                                 })}
                             </div>
                         </div>
@@ -1463,25 +1494,46 @@ export default function Expeditions() {
                         >
                             <div style={{}}>
                                 <div>
-                                    <h4 style={{ margin: '6px', textAlign: 'center', fontSize: '20px' }}>Pet Whitelist</h4>
-                                    <h4 style={{ margin: '6px', textAlign: 'center', fontSize: '20px', color: 'red' }}>{`${whiteListAlertText}`}</h4>
+                                    <h4 style={{ margin: '6px', textAlign: 'center', fontSize: '20px' }}>Pet
+                                        Whitelist</h4>
+                                    <h4 style={{
+                                        margin: '6px',
+                                        textAlign: 'center',
+                                        fontSize: '20px',
+                                        color: 'red',
+                                    }}>{`${whiteListAlertText}`}</h4>
                                 </div>
                                 {/* Pet whitelist stuff */}
-                                <div style={{ margin: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '36px' }}>
+                                <div style={{
+                                    margin: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    height: '36px',
+                                }}>
                                     <SearchBox data={{
-                                        list: filterablePets
+                                        list: filterablePets,
                                     }}
-                                        onSelect={(e) => {
-                                            setPetWhiteList((curr) => {
-                                                let temp = [...curr];
-                                                let petObj = data.PetsCollection.find((search_pet) => search_pet.ID === e.id);
-                                                temp.push({ ...e, placement: 'auto', parameters: { team: 0, damageBias: 17 }, pet: petObj });
-                                                return temp;
-                                            })
-                                            setRefreshGroups(true);
-                                        }}
+                                               onSelect={(e) => {
+                                                   setPetWhiteList((curr) => {
+                                                       let temp = [...curr];
+                                                       let petObj = data.PetsCollection.find((search_pet) => search_pet.ID === e.id);
+                                                       temp.push({
+                                                           ...e,
+                                                           placement: 'auto',
+                                                           parameters: { team: 0, damageBias: 17 },
+                                                           pet: petObj,
+                                                       });
+                                                       return temp;
+                                                   });
+                                                   setRefreshGroups(true);
+                                               }}
                                     />
-                                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'space-between',
+                                    }}>
 
                                         <div
                                             style={{ display: 'flex', justifyContent: 'space-between' }}
@@ -1492,9 +1544,13 @@ export default function Expeditions() {
                                                 Team Presets
                                             </div>
                                             <select
-                                                className='importantText'
-                                                style={{ maxWidth: '144px', backgroundColor: '#171717', borderRadius: '4px' }}
-                                                aria-label='Select your in game teams to quickly add those pets to whitelist'
+                                                className="importantText"
+                                                style={{
+                                                    maxWidth: '144px',
+                                                    backgroundColor: '#171717',
+                                                    borderRadius: '4px',
+                                                }}
+                                                aria-label="Select your in game teams to quickly add those pets to whitelist"
                                                 onChange={
                                                     (e) => {
 
@@ -1513,22 +1569,23 @@ export default function Expeditions() {
                                                                         // placement: 'rel',
                                                                         placement: 'auto',
                                                                         parameters: { team: 0, damageBias: 17 },
-                                                                        pet: data.PetsCollection.find((pet_search) => pet_search.ID === selected)
-                                                                    }
+                                                                        pet: data.PetsCollection.find((pet_search) => pet_search.ID === selected),
+                                                                    };
                                                                     if (!temp.find((inner_find) => inner_find.id === base.id)) {
                                                                         temp.push(base);
                                                                     }
                                                                 }
                                                             }
                                                             return temp;
-                                                        })
+                                                        });
                                                         setRefreshGroups(true);
                                                     }
                                                 }
                                                 value={''}
                                             >
                                                 {
-                                                    [<option value='' key={'initial one'}>Select Team</option>, ...data.PetsLoadout.map((cur, index) => {
+                                                    [<option value="" key={'initial one'}>Select
+                                                        Team</option>, ...data.PetsLoadout.map((cur, index) => {
 
                                                         if (cur.Locked === 0) return;
 
@@ -1538,7 +1595,7 @@ export default function Expeditions() {
                                                                 value={index}
 
                                                             >{cur.Name}</option>
-                                                        )
+                                                        );
                                                     })]
                                                 }
                                             </select>
@@ -1552,9 +1609,14 @@ export default function Expeditions() {
                                                 Recommended Teams
                                             </div>
                                             <select
-                                                aria-label='Select a default team preset'
-                                                className='importantText'
-                                                style={{ maxWidth: '144px', backgroundColor: '#171717', borderRadius: '4px', marginLeft: '12px' }}
+                                                aria-label="Select a default team preset"
+                                                className="importantText"
+                                                style={{
+                                                    maxWidth: '144px',
+                                                    backgroundColor: '#171717',
+                                                    borderRadius: '4px',
+                                                    marginLeft: '12px',
+                                                }}
                                                 onChange={
                                                     (selected_mode) => {
                                                         setRecommendedSelected(true);
@@ -1596,10 +1658,16 @@ export default function Expeditions() {
                                                         let petWhiteListNew = {};
                                                         for (const [key, value] of Object.entries(presetPets)) {
                                                             if (!unlockedPetsMap[key]) {
-                                                                petWhiteListNew[key] = { ID: key, name: petNames[key].name, mode: (value as any).mode };
-                                                            }
-                                                            else {
-                                                                petWhiteListNew[key] = { ...unlockedPetsMap[key], mode: (value as any).mode };
+                                                                petWhiteListNew[key] = {
+                                                                    ID: key,
+                                                                    name: petNames[key].name,
+                                                                    mode: (value as any).mode,
+                                                                };
+                                                            } else {
+                                                                petWhiteListNew[key] = {
+                                                                    ...unlockedPetsMap[key],
+                                                                    mode: (value as any).mode,
+                                                                };
                                                             }
                                                         }
                                                         petWhiteList = petWhiteListNew;
@@ -1612,8 +1680,8 @@ export default function Expeditions() {
                                                                 priorityMap: priorityMap,
                                                                 petWhiteList: petWhiteList,
                                                                 usePromos: usePromos,
-                                                                maxTopStat: maxTopStat
-                                                            }
+                                                                maxTopStat: maxTopStat,
+                                                            },
                                                         );
 
                                                         let combinedList = airPets.concat(groundPets);
@@ -1630,20 +1698,20 @@ export default function Expeditions() {
                                                                         // placement: 'rel',
                                                                         placement: 'auto',
                                                                         parameters: { team: 0, damageBias: 17 },
-                                                                        pet: data.PetsCollection.find((pet_search) => pet_search.ID === selected)
-                                                                    }
+                                                                        pet: data.PetsCollection.find((pet_search) => pet_search.ID === selected),
+                                                                    };
                                                                     if (!temp.find((inner_find) => inner_find.id === base.id)) {
                                                                         temp.push(base);
                                                                     }
                                                                 }
                                                             }
                                                             return temp;
-                                                        })
+                                                        });
                                                         setRefreshGroups(true);
                                                     }
                                                 }
                                                 defaultValue={' '}
-                                            // value={petWhiteList[e.ID].mode}
+                                                // value={petWhiteList[e.ID].mode}
                                             >
                                                 {!recommendedSelected && (<option value="None">Select Preset</option>)}
                                                 <option value="Main Team">Main Team</option>
@@ -1656,14 +1724,14 @@ export default function Expeditions() {
                                 </div>
                             </div>
 
-                            <div className='importantText'
-                                style={{
-                                    width: '100%',
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    fontWeight: 'bold',
-                                    color: numGround > maxType ? 'red' : ''
-                                }}
+                            <div className="importantText"
+                                 style={{
+                                     width: '100%',
+                                     display: 'flex',
+                                     justifyContent: 'center',
+                                     fontWeight: 'bold',
+                                     color: numGround > maxType ? 'red' : '',
+                                 }}
                             >
                                 {`Ground Pets (${numGround}/${maxType})`}
                             </div>
@@ -1717,7 +1785,7 @@ export default function Expeditions() {
                                                 Group: Forces the pet to go into a certain group
                                             </div>
                                             <div>
-                                                Auto:  Tries to find optimal placement automatically
+                                                Auto: Tries to find optimal placement automatically
                                             </div>
                                             {/* <div>
                                                 Relative: Tries to find optimal placement automatically based on `damage bias`
@@ -1728,9 +1796,14 @@ export default function Expeditions() {
                                             <div>
                                                 Placement
                                             </div>
-                                            <div style={{ height: '18px', width: '18px', position: 'relative', marginLeft: '6px' }} >
+                                            <div style={{
+                                                height: '18px',
+                                                width: '18px',
+                                                position: 'relative',
+                                                marginLeft: '6px',
+                                            }}>
                                                 <Image
-                                                    alt='on hover I in a cirlce icon, shows more information on hover'
+                                                    alt="on hover I in a cirlce icon, shows more information on hover"
                                                     src={infoIcon}
                                                     fill
                                                 />
@@ -1771,9 +1844,14 @@ export default function Expeditions() {
                                             <div>
                                                 Parameters
                                             </div>
-                                            <div style={{ height: '18px', width: '18px', position: 'relative', marginLeft: '6px' }} >
+                                            <div style={{
+                                                height: '18px',
+                                                width: '18px',
+                                                position: 'relative',
+                                                marginLeft: '6px',
+                                            }}>
                                                 <Image
-                                                    alt='on hover I in a cirlce icon, shows more information on hover'
+                                                    alt="on hover I in a cirlce icon, shows more information on hover"
                                                     src={infoIcon}
                                                     fill
                                                 />
@@ -1792,10 +1870,10 @@ export default function Expeditions() {
                                     if (pet.pet.Type === 2) return <></>;
 
                                     let petLabel = pet.label;
-                                    let petGroup = ``
+                                    let petGroup = ``;
                                     if (pet.id in relWhiteListMap) {
                                         // petLabel += ` (Group: ${relWhiteListMap[pet.id].finalGroup + 1})`
-                                        petGroup += `(Group: ${relWhiteListMap[pet.id].finalGroup + 1})`
+                                        petGroup += `(Group: ${relWhiteListMap[pet.id].finalGroup + 1})`;
                                     }
 
                                     let showRed = false;//Too high
@@ -1806,7 +1884,7 @@ export default function Expeditions() {
                                     if (pet.placement !== `blacklist`) {
 
                                         let group_index = groups.findIndex((temp_e) => {
-                                            return temp_e.find((temp_e2) => temp_e2.ID === pet.id)
+                                            return temp_e.find((temp_e2) => temp_e2.ID === pet.id);
                                         });
 
                                         if (group_index > -1) {
@@ -1836,7 +1914,7 @@ export default function Expeditions() {
                                                                 triedPets[temp_pet.ID] = true;
                                                                 foundNew = true;
                                                                 tempGroup = [...group];
-                                                                let ind = tempGroup.findIndex((temp_repl) => temp_repl.ID === pet.pet.ID)
+                                                                let ind = tempGroup.findIndex((temp_repl) => temp_repl.ID === pet.pet.ID);
                                                                 tempGroup[ind] = temp_pet;
                                                             }
                                                         }
@@ -1846,7 +1924,7 @@ export default function Expeditions() {
 
                                                     if (newGroupScore > originalGroupScore) {
                                                         showRed = true;
-                                                        hoverMsg = `${petLabel} might be too high, try ${pet.placement === 'rel' ? `increase` : `lowering`} the value to drop them to a lower team`
+                                                        hoverMsg = `${petLabel} might be too high, try ${pet.placement === 'rel' ? `increase` : `lowering`} the value to drop them to a lower team`;
                                                     }
                                                     tempGroup = [];
                                                 }
@@ -1872,7 +1950,7 @@ export default function Expeditions() {
                                                                 triedPets[temp_pet.ID] = true;
                                                                 foundNew = true;
                                                                 tempGroup = [...groups[group_index - 1]];
-                                                                let ind = tempGroup.findIndex((temp_repl) => temp_repl.ID === temp_pet.ID)
+                                                                let ind = tempGroup.findIndex((temp_repl) => temp_repl.ID === temp_pet.ID);
                                                                 tempGroup[ind] = pet.pet;
                                                             }
                                                         }
@@ -1882,7 +1960,7 @@ export default function Expeditions() {
 
                                                     if (newGroupScore > originalGroupScore) {
                                                         showGreen = true;
-                                                        hoverMsg = ` ${petLabel} might be too low, try ${pet.placement === 'rel' ? `lowering` : `increasing`} the value to bump them to a higher team`
+                                                        hoverMsg = ` ${petLabel} might be too low, try ${pet.placement === 'rel' ? `lowering` : `increasing`} the value to bump them to a higher team`;
                                                     }
                                                     tempGroup = [];
                                                 }
@@ -1905,7 +1983,7 @@ export default function Expeditions() {
                                                 width: '100%',
                                                 height: '25px',
                                                 backgroundColor: (index % 2) === 0 ? 'rgba(255,255,255, 0.07)' : 'rgba(255,255,255, 0.005)',
-                                                color: numGround > maxType ? 'red' : ''
+                                                color: numGround > maxType ? 'red' : '',
                                             }}
 
                                         >
@@ -1918,12 +1996,12 @@ export default function Expeditions() {
                                                 position: 'relative',
                                                 borderTop: index === 0 ? '' : '1px solid rgba(255,255,255,0.8)',
                                             }}
-                                                onMouseEnter={() => {
-                                                    setActivePet(pet.id)
-                                                }}
-                                                onMouseLeave={() => {
-                                                    setActivePet(-1);
-                                                }}
+                                                 onMouseEnter={() => {
+                                                     setActivePet(pet.id);
+                                                 }}
+                                                 onMouseLeave={() => {
+                                                     setActivePet(-1);
+                                                 }}
                                             >
                                                 <div
                                                     style={{
@@ -1931,20 +2009,20 @@ export default function Expeditions() {
                                                         width: '100%',
                                                         display: 'flex',
                                                         justifyContent: 'space-between',
-                                                        zIndex: '1'
+                                                        zIndex: '1',
                                                     }}
 
                                                 >
                                                     <div
                                                         style={{
-                                                            marginLeft: '6px'
+                                                            marginLeft: '6px',
                                                         }}
                                                     >
                                                         {petLabel}
                                                     </div>
                                                     <div
                                                         style={{
-                                                            marginRight: '34px'
+                                                            marginRight: '34px',
                                                         }}
                                                     >
                                                         {petGroup}
@@ -1956,21 +2034,21 @@ export default function Expeditions() {
                                                         height: '12px', width: '12px',
                                                         margin: '0 12px 0 auto',
                                                         zIndex: '2',
-                                                        position: 'relative'
+                                                        position: 'relative',
                                                     }}
                                                     onClick={(e) => {
                                                         setPetWhiteList((curr) => {
                                                             let temp = [...curr];
                                                             temp = temp.filter((inner_pet) => {
-                                                                return inner_pet.id !== pet.id
+                                                                return inner_pet.id !== pet.id;
                                                             });
                                                             return temp;
-                                                        })
+                                                        });
                                                         setRefreshGroups(true);
                                                     }}
                                                 >
                                                     <Image
-                                                        alt='X (cross to remove)'
+                                                        alt="X (cross to remove)"
                                                         src={xIcon}
                                                         fill
                                                     />
@@ -1990,9 +2068,13 @@ export default function Expeditions() {
                                             }}>
 
                                                 <select
-                                                    className='importantText'
-                                                    style={{ maxWidth: '144px', backgroundColor: (index % 2) === 0 ? '#252525' : '#171717', borderRadius: '4px' }}
-                                                    aria-label='Select what kind of placement the pet will have'
+                                                    className="importantText"
+                                                    style={{
+                                                        maxWidth: '144px',
+                                                        backgroundColor: (index % 2) === 0 ? '#252525' : '#171717',
+                                                        borderRadius: '4px',
+                                                    }}
+                                                    aria-label="Select what kind of placement the pet will have"
                                                     value={pet.placement}
                                                     onChange={
                                                         (choice) => {
@@ -2002,7 +2084,7 @@ export default function Expeditions() {
                                                                 let tempPet = temp.find((inner_pet) => inner_pet.id === pet.id);
                                                                 tempPet.placement = choice.target.value;
                                                                 return temp;
-                                                            })
+                                                            });
                                                             setRefreshGroups(true);
                                                         }
                                                     }
@@ -2031,9 +2113,14 @@ export default function Expeditions() {
                                                 {pet.placement === 'team' && (
                                                     <div style={{ marginLeft: (showGreen || showRed) ? '22px' : '' }}>
                                                         <select
-                                                            className='importantText'
-                                                            style={{ maxWidth: '144px', backgroundColor: (index % 2) === 0 ? '#252525' : '#171717', borderRadius: '4px', width: '44px' }}
-                                                            aria-label='Select what team the pet will be placed in'
+                                                            className="importantText"
+                                                            style={{
+                                                                maxWidth: '144px',
+                                                                backgroundColor: (index % 2) === 0 ? '#252525' : '#171717',
+                                                                borderRadius: '4px',
+                                                                width: '44px',
+                                                            }}
+                                                            aria-label="Select what team the pet will be placed in"
                                                             value={pet.parameters.team}
                                                             onChange={
                                                                 (choice) => {
@@ -2042,14 +2129,15 @@ export default function Expeditions() {
                                                                         let tempPet = temp.find((inner_pet) => inner_pet.id === pet.id);
                                                                         tempPet.parameters.team = Number(choice.target.value);
                                                                         return temp;
-                                                                    })
+                                                                    });
                                                                     setRefreshGroups(true);
                                                                 }
                                                             }
                                                         >
                                                             {Array.apply(null, Array(Number(numTeams)))
                                                                 .map((e, index) => {
-                                                                    return <option value={index} key={index}>{index + 1}</option>
+                                                                    return <option value={index}
+                                                                                   key={index}>{index + 1}</option>;
                                                                 })}
 
 
@@ -2060,8 +2148,8 @@ export default function Expeditions() {
                                                 {pet.placement === `rel` && (
                                                     <div style={{ marginLeft: (showGreen || showRed) ? '22px' : '' }}>
                                                         <input
-                                                            className='importantText textMedium2'
-                                                            aria-label='Damage bias to control when the pet should go in'
+                                                            className="importantText textMedium2"
+                                                            aria-label="Damage bias to control when the pet should go in"
                                                             style={{
                                                                 maxWidth: '36px',
                                                                 backgroundColor: '#1b1b1b',
@@ -2069,7 +2157,7 @@ export default function Expeditions() {
                                                                 // @ts-ignore TODO: duplicated property
                                                                 backgroundColor: (index % 2) === 0 ? '#252525' : '#171717',
                                                             }}
-                                                            type='number'
+                                                            type="number"
                                                             // className='prepNumber'
                                                             value={pet.parameters.damageBias}
                                                             onChange={
@@ -2086,10 +2174,9 @@ export default function Expeditions() {
                                                                             let tempPet = temp.find((inner_pet) => inner_pet.id === pet.id);
                                                                             tempPet.parameters.damageBias = Number(x);
                                                                             return temp;
-                                                                        })
+                                                                        });
                                                                         setRefreshGroups(true);
-                                                                    }
-                                                                    catch (err) {
+                                                                    } catch (err) {
                                                                         console.log(err);
                                                                     }
                                                                 }}
@@ -2104,7 +2191,7 @@ export default function Expeditions() {
                                                 )}
                                                 {(showGreen || showRed) && (
                                                     <div
-                                                    // style={{ position: 'absolute', right: '5%' }}
+                                                        // style={{ position: 'absolute', right: '5%' }}
                                                     >
 
                                                         <MouseOverPopover
@@ -2112,9 +2199,15 @@ export default function Expeditions() {
                                                             muiHeight={'20px'}
                                                             tooltip={<div>{hoverMsg}</div>} style={{ display: 'flex', alignItems: 'center', height: '20px' }}>
 
-                                                            <div style={{ height: '20px', width: '20px', marginLeft: '3px', marginTop: '2px', position: 'relative' }}>
+                                                            <div style={{
+                                                                height: '20px',
+                                                                width: '20px',
+                                                                marginLeft: '3px',
+                                                                marginTop: '2px',
+                                                                position: 'relative',
+                                                            }}>
                                                                 <Image
-                                                                    alt='on hover I in a cirlce icon, shows more information on hover'
+                                                                    alt="on hover I in a cirlce icon, shows more information on hover"
                                                                     src={showGreen ? infoIconGreenThick : infoIconRedThick}
                                                                     fill
                                                                 />
@@ -2129,23 +2222,23 @@ export default function Expeditions() {
                                                 )}
                                             </div>
                                         </div>
-                                    )
+                                    );
                                 })}
                             </div>
 
 
-                            <div className='importantText'
-                                style={{
-                                    width: '100%',
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    fontWeight: 'bold',
-                                    borderTop: '1px solid rgba(255,255,255,0.8)',
-                                    paddingTop: '6px',
-                                    paddingBottom: '6px',
-                                    color: numAir > maxType ? 'red' : ''
-                                    // marginTop: '6px'
-                                }}
+                            <div className="importantText"
+                                 style={{
+                                     width: '100%',
+                                     display: 'flex',
+                                     justifyContent: 'center',
+                                     fontWeight: 'bold',
+                                     borderTop: '1px solid rgba(255,255,255,0.8)',
+                                     paddingTop: '6px',
+                                     paddingBottom: '6px',
+                                     color: numAir > maxType ? 'red' : '',
+                                     // marginTop: '6px'
+                                 }}
                             >
                                 {`Air Pets (${numAir}/${maxType})`}
                             </div>
@@ -2199,7 +2292,7 @@ export default function Expeditions() {
                                                 Group: Forces the pet to go into a certain group
                                             </div>
                                             <div>
-                                                Auto:  Tries to find optimal placement automatically
+                                                Auto: Tries to find optimal placement automatically
                                             </div>
                                             {/* <div>
                                                 Relative: Tries to find optimal placement automatically based on `damage bias`
@@ -2210,9 +2303,14 @@ export default function Expeditions() {
                                             <div>
                                                 Placement
                                             </div>
-                                            <div style={{ height: '18px', width: '18px', position: 'relative', marginLeft: '6px' }} >
+                                            <div style={{
+                                                height: '18px',
+                                                width: '18px',
+                                                position: 'relative',
+                                                marginLeft: '6px',
+                                            }}>
                                                 <Image
-                                                    alt='on hover I in a cirlce icon, shows more information on hover'
+                                                    alt="on hover I in a cirlce icon, shows more information on hover"
                                                     src={infoIcon}
                                                     fill
                                                 />
@@ -2253,9 +2351,14 @@ export default function Expeditions() {
                                             <div>
                                                 Parameters
                                             </div>
-                                            <div style={{ height: '18px', width: '18px', position: 'relative', marginLeft: '6px' }} >
+                                            <div style={{
+                                                height: '18px',
+                                                width: '18px',
+                                                position: 'relative',
+                                                marginLeft: '6px',
+                                            }}>
                                                 <Image
-                                                    alt='on hover I in a cirlce icon, shows more information on hover'
+                                                    alt="on hover I in a cirlce icon, shows more information on hover"
                                                     src={infoIcon}
                                                     fill
                                                 />
@@ -2274,10 +2377,10 @@ export default function Expeditions() {
                                     if (pet.pet.Type === 1) return <></>;
 
                                     let petLabel = pet.label;
-                                    let petGroup = ``
+                                    let petGroup = ``;
                                     if (pet.id in relWhiteListMap) {
                                         // petLabel += ` (Group: ${relWhiteListMap[pet.id].finalGroup + 1})`
-                                        petGroup += `(Group: ${relWhiteListMap[pet.id].finalGroup + 1})`
+                                        petGroup += `(Group: ${relWhiteListMap[pet.id].finalGroup + 1})`;
                                     }
 
                                     let showRed = false;//Too high
@@ -2288,7 +2391,7 @@ export default function Expeditions() {
                                     if (pet.placement !== `blacklist`) {
 
                                         let group_index = groups.findIndex((temp_e) => {
-                                            return temp_e.find((temp_e2) => temp_e2.ID === pet.id)
+                                            return temp_e.find((temp_e2) => temp_e2.ID === pet.id);
                                         });
 
                                         if (group_index > -1) {
@@ -2318,7 +2421,7 @@ export default function Expeditions() {
                                                                 triedPets[temp_pet.ID] = true;
                                                                 foundNew = true;
                                                                 tempGroup = [...group];
-                                                                let ind = tempGroup.findIndex((temp_repl) => temp_repl.ID === pet.pet.ID)
+                                                                let ind = tempGroup.findIndex((temp_repl) => temp_repl.ID === pet.pet.ID);
                                                                 tempGroup[ind] = temp_pet;
                                                             }
                                                         }
@@ -2328,7 +2431,7 @@ export default function Expeditions() {
 
                                                     if (newGroupScore > originalGroupScore) {
                                                         showRed = true;
-                                                        hoverMsg = `${petLabel} might be too high, try ${pet.placement === 'rel' ? `increase` : `lowering`} the value to drop them to a lower team`
+                                                        hoverMsg = `${petLabel} might be too high, try ${pet.placement === 'rel' ? `increase` : `lowering`} the value to drop them to a lower team`;
                                                     }
                                                     tempGroup = [];
                                                 }
@@ -2354,7 +2457,7 @@ export default function Expeditions() {
                                                                 triedPets[temp_pet.ID] = true;
                                                                 foundNew = true;
                                                                 tempGroup = [...groups[group_index - 1]];
-                                                                let ind = tempGroup.findIndex((temp_repl) => temp_repl.ID === temp_pet.ID)
+                                                                let ind = tempGroup.findIndex((temp_repl) => temp_repl.ID === temp_pet.ID);
                                                                 tempGroup[ind] = pet.pet;
                                                             }
                                                         }
@@ -2364,7 +2467,7 @@ export default function Expeditions() {
 
                                                     if (newGroupScore > originalGroupScore) {
                                                         showGreen = true;
-                                                        hoverMsg = ` ${petLabel} might be too low, try ${pet.placement === 'rel' ? `lowering` : `increasing`} the value to bump them to a higher team`
+                                                        hoverMsg = ` ${petLabel} might be too low, try ${pet.placement === 'rel' ? `lowering` : `increasing`} the value to bump them to a higher team`;
                                                     }
                                                     tempGroup = [];
                                                 }
@@ -2387,7 +2490,7 @@ export default function Expeditions() {
                                                 width: '100%',
                                                 height: '25px',
                                                 backgroundColor: (index % 2) === 0 ? 'rgba(255,255,255, 0.07)' : 'rgba(255,255,255, 0.005)',
-                                                color: numAir > maxType ? 'red' : ''
+                                                color: numAir > maxType ? 'red' : '',
                                             }}
 
                                         >
@@ -2400,12 +2503,12 @@ export default function Expeditions() {
                                                 position: 'relative',
                                                 borderTop: index === 0 ? '' : '1px solid rgba(255,255,255,0.8)',
                                             }}
-                                                onMouseEnter={() => {
-                                                    setActivePet(pet.id)
-                                                }}
-                                                onMouseLeave={() => {
-                                                    setActivePet(-1);
-                                                }}
+                                                 onMouseEnter={() => {
+                                                     setActivePet(pet.id);
+                                                 }}
+                                                 onMouseLeave={() => {
+                                                     setActivePet(-1);
+                                                 }}
                                             >
                                                 <div
                                                     style={{
@@ -2413,20 +2516,20 @@ export default function Expeditions() {
                                                         width: '100%',
                                                         display: 'flex',
                                                         justifyContent: 'space-between',
-                                                        zIndex: '1'
+                                                        zIndex: '1',
                                                     }}
 
                                                 >
                                                     <div
                                                         style={{
-                                                            marginLeft: '6px'
+                                                            marginLeft: '6px',
                                                         }}
                                                     >
                                                         {petLabel}
                                                     </div>
                                                     <div
                                                         style={{
-                                                            marginRight: '34px'
+                                                            marginRight: '34px',
                                                         }}
                                                     >
                                                         {petGroup}
@@ -2438,21 +2541,21 @@ export default function Expeditions() {
                                                         height: '12px', width: '12px',
                                                         margin: '0 12px 0 auto',
                                                         zIndex: '2',
-                                                        position: 'relative'
+                                                        position: 'relative',
                                                     }}
                                                     onClick={(e) => {
                                                         setPetWhiteList((curr) => {
                                                             let temp = [...curr];
                                                             temp = temp.filter((inner_pet) => {
-                                                                return inner_pet.id !== pet.id
+                                                                return inner_pet.id !== pet.id;
                                                             });
                                                             return temp;
-                                                        })
+                                                        });
                                                         setRefreshGroups(true);
                                                     }}
                                                 >
                                                     <Image
-                                                        alt='X (cross to remove)'
+                                                        alt="X (cross to remove)"
                                                         src={xIcon}
                                                         fill
                                                     />
@@ -2468,13 +2571,16 @@ export default function Expeditions() {
                                                 borderRight: '1px solid rgba(255,255,255,0.8)',
                                                 borderLeft: '1px solid rgba(255,255,255,0.8)',
                                                 borderTop: index === 0 ? '' : '1px solid rgba(255,255,255,0.8)',
-
                                             }}>
 
                                                 <select
-                                                    className='importantText'
-                                                    style={{ maxWidth: '144px', backgroundColor: (index % 2) === 0 ? '#252525' : '#171717', borderRadius: '4px' }}
-                                                    aria-label='Select what kind of placement the pet will have'
+                                                    className="importantText"
+                                                    style={{
+                                                        maxWidth: '144px',
+                                                        backgroundColor: (index % 2) === 0 ? '#252525' : '#171717',
+                                                        borderRadius: '4px',
+                                                    }}
+                                                    aria-label="Select what kind of placement the pet will have"
                                                     value={pet.placement}
                                                     onChange={
                                                         (choice) => {
@@ -2484,7 +2590,7 @@ export default function Expeditions() {
                                                                 let tempPet = temp.find((inner_pet) => inner_pet.id === pet.id);
                                                                 tempPet.placement = choice.target.value;
                                                                 return temp;
-                                                            })
+                                                            });
                                                             setRefreshGroups(true);
                                                         }
                                                     }
@@ -2507,15 +2613,20 @@ export default function Expeditions() {
                                                     display: 'flex',
                                                     justifyContent: 'center',
                                                     alignItems: 'center',
-                                                    borderTop: index === 0 ? '' : '1px solid rgba(255,255,255,0.8)'
+                                                    borderTop: index === 0 ? '' : '1px solid rgba(255,255,255,0.8)',
                                                 }}
                                             >
                                                 {pet.placement === 'team' && (
                                                     <div style={{ marginLeft: (showGreen || showRed) ? '22px' : '' }}>
                                                         <select
-                                                            className='importantText'
-                                                            style={{ maxWidth: '144px', backgroundColor: (index % 2) === 0 ? '#252525' : '#171717', borderRadius: '4px', width: '44px' }}
-                                                            aria-label='Select what team the pet will be placed in'
+                                                            className="importantText"
+                                                            style={{
+                                                                maxWidth: '144px',
+                                                                backgroundColor: (index % 2) === 0 ? '#252525' : '#171717',
+                                                                borderRadius: '4px',
+                                                                width: '44px',
+                                                            }}
+                                                            aria-label="Select what team the pet will be placed in"
                                                             value={pet.parameters.team}
                                                             onChange={
                                                                 (choice) => {
@@ -2524,14 +2635,15 @@ export default function Expeditions() {
                                                                         let tempPet = temp.find((inner_pet) => inner_pet.id === pet.id);
                                                                         tempPet.parameters.team = Number(choice.target.value);
                                                                         return temp;
-                                                                    })
+                                                                    });
                                                                     setRefreshGroups(true);
                                                                 }
                                                             }
                                                         >
                                                             {Array.apply(null, Array(Number(numTeams)))
                                                                 .map((e, index) => {
-                                                                    return <option value={index} key={index}>{index + 1}</option>
+                                                                    return <option value={index}
+                                                                                   key={index}>{index + 1}</option>;
                                                                 })}
 
 
@@ -2564,10 +2676,9 @@ export default function Expeditions() {
                                                                             let tempPet = temp.find((inner_pet) => inner_pet.id === pet.id);
                                                                             tempPet.parameters.damageBias = Number(x);
                                                                             return temp;
-                                                                        })
+                                                                        });
                                                                         setRefreshGroups(true);
-                                                                    }
-                                                                    catch (err) {
+                                                                    } catch (err) {
                                                                         console.log(err);
                                                                     }
                                                                 }}
@@ -2582,16 +2693,22 @@ export default function Expeditions() {
                                                 )}
                                                 {(showGreen || showRed) && (
                                                     <div
-                                                    // style={{ position: 'absolute', right: '5%' }}
+                                                        // style={{ position: 'absolute', right: '5%' }}
                                                     >
                                                         <MouseOverPopover
                                                             // @ts-ignore TODO: muiHeight does not exist
                                                             muiHeight={'20px'}
                                                             tooltip={<div>{hoverMsg}</div>} style={{ display: 'flex', alignItems: 'center', height: '20px' }}>
 
-                                                            <div style={{ height: '20px', width: '20px', marginLeft: '3px', marginTop: '2px', position: 'relative' }}>
+                                                            <div style={{
+                                                                height: '20px',
+                                                                width: '20px',
+                                                                marginLeft: '3px',
+                                                                marginTop: '2px',
+                                                                position: 'relative',
+                                                            }}>
                                                                 <Image
-                                                                    alt='on hover I in a cirlce icon, shows more information on hover'
+                                                                    alt="on hover I in a cirlce icon, shows more information on hover"
                                                                     src={showGreen ? infoIconGreenThick : infoIconRedThick}
                                                                     fill
                                                                 />
@@ -2606,12 +2723,9 @@ export default function Expeditions() {
                                                 )}
                                             </div>
                                         </div>
-                                    )
+                                    );
                                 })}
                             </div>
-
-
-
                         </div>
                     )}
 
@@ -2629,7 +2743,13 @@ export default function Expeditions() {
                             {/* Alerting overall impossible filters combinations */}
                             {failedFilters['generic'] && (
                                 <div
-                                    style={{ fontWeight: 'bold', color: 'red', display: 'flex', width: '100%', justifyContent: 'center' }}
+                                    style={{
+                                        fontWeight: 'bold',
+                                        color: 'red',
+                                        display: 'flex',
+                                        width: '100%',
+                                        justifyContent: 'center',
+                                    }}
 
                                 >
                                     {failedFilters['generic']}
@@ -2639,23 +2759,39 @@ export default function Expeditions() {
                             {/* left over pets */}
                             {(
                                 <div
-                                    style={{ display: 'flex', width: '100%', flexDirection: 'column', }}
+                                    style={{ display: 'flex', width: '100%', flexDirection: 'column' }}
                                 >
                                     {/* Title */}
                                     <div
                                         style={{ display: 'flex', margin: '6px', alignSelf: 'center' }}
                                     >
-                                        <h4 style={{ margin: '0', fontSize: '20px', textAlign: 'center', display: 'flex', alignItems: 'center' }}>
+                                        <h4 style={{
+                                            margin: '0',
+                                            fontSize: '20px',
+                                            textAlign: 'center',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                        }}>
                                             <div>
                                                 {`Pet Bonus Finder`}
                                             </div>
-                                            <div style={{ fontSize: '16px', fontWeight: 'normal', color: numGround >= maxType ? 'red' : '', marginLeft: "6px" }}>
+                                            <div style={{
+                                                fontSize: '16px',
+                                                fontWeight: 'normal',
+                                                color: numGround >= maxType ? 'red' : '',
+                                                marginLeft: '6px',
+                                            }}>
                                                 {`(${numGround} / ${maxType} Ground)`}
                                             </div>
-                                            <div style={{ marginLeft: '6px', fontSize: '16px', fontWeight: 'normal', }}>
+                                            <div style={{ marginLeft: '6px', fontSize: '16px', fontWeight: 'normal' }}>
                                                 {`&`}
                                             </div>
-                                            <div style={{ fontSize: '16px', fontWeight: 'normal', color: numAir >= maxType ? 'red' : '', marginLeft: "6px" }}>
+                                            <div style={{
+                                                fontSize: '16px',
+                                                fontWeight: 'normal',
+                                                color: numAir >= maxType ? 'red' : '',
+                                                marginLeft: '6px',
+                                            }}>
                                                 {`(${numAir} / ${maxType} Air) `}
                                             </div>
                                         </h4>
@@ -2675,9 +2811,9 @@ export default function Expeditions() {
 
                                             <SearchBox
                                                 updateBox={true}
-                                                placeholder='Enter a bonus'
+                                                placeholder="Enter a bonus"
                                                 data={{
-                                                    list: filterableBonuses
+                                                    list: filterableBonuses,
                                                 }}
                                                 onSelect={(e) => {
                                                     console.log(e);
@@ -2694,7 +2830,7 @@ export default function Expeditions() {
                                             borderTop: '1px solid rgba(255,255,255,0.8)',
                                             borderBottom: '1px solid rgba(255,255,255,0.8)',
                                             backgroundColor: 'rgba(255,255,255, 0.14)',
-                                            margin: '6px 0 0 0'
+                                            margin: '6px 0 0 0',
                                         }}
                                     >
                                         <div
@@ -2715,12 +2851,12 @@ export default function Expeditions() {
                                                 width: '30%',
                                                 display: 'flex',
                                                 justifyContent: 'center',
-                                                alignItems: 'center'
+                                                alignItems: 'center',
                                             }}
                                         >
                                             <MouseOverPopover tooltip={
                                                 <div style={{ padding: '6px' }}>
-                                                    <div>The {`pet's`} damage </div>
+                                                    <div>The {`pet's`} damage</div>
                                                 </div>
                                             }>
                                                 <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -2733,17 +2869,17 @@ export default function Expeditions() {
 
                                     </div>
                                     {/* Pets */}
-                                    <div style={{ margin: '0 0px 0 0px', }}>
+                                    <div style={{ margin: '0 0px 0 0px' }}>
                                         {leftOver1Pets.map((pet, index) => {
-                                            let staticPetData = petNameArray.find(staticPetDatum => staticPetDatum.petId === pet.ID)
+                                            let staticPetData = petNameArray.find(staticPetDatum => staticPetDatum.petId === pet.ID);
 
                                             if (!staticPetData) {
                                                 staticPetData = {
                                                     img: missing,
                                                     location: '??-??',
                                                     name: 'Unknown',
-                                                    petId: pet.ID
-                                                }
+                                                    petId: pet.ID,
+                                                };
                                             }
                                             return (
                                                 <div
@@ -2791,7 +2927,8 @@ export default function Expeditions() {
                                                                     petData={staticPetData}
                                                                     fullPetData={pet}
                                                                     data={data}
-                                                                    onClick={() => { }}
+                                                                    onClick={() => {
+                                                                    }}
                                                                     weightMap={weightMap}
                                                                     defaultRank={defaultRank}
                                                                 />
@@ -2812,31 +2949,39 @@ export default function Expeditions() {
                                                             >
                                                                 <div style={{
                                                                     position: 'relative',
-                                                                    width: '20px', height: '20px'
+                                                                    width: '20px', height: '20px',
                                                                 }}
-                                                                    onClick={(e) => {
-                                                                        setPetWhiteList((curr) => {
-                                                                            let temp = [...curr];
+                                                                     onClick={(e) => {
+                                                                         setPetWhiteList((curr) => {
+                                                                             let temp = [...curr];
 
-                                                                            let pet_inner = temp.find((sample_pet) => sample_pet.id === pet.ID);
-                                                                            if (!pet_inner) {
-                                                                                temp.push({ label: petNames[pet.ID].name, pet: pet, id: pet.ID, placement: 'auto', parameters: { team: 0, damageBias: 17 } });
-                                                                            }
-                                                                            else {
-                                                                                throw new Error(`should not have an existing pet in this list!`)
-                                                                            }
-                                                                            return temp;
-                                                                        })
+                                                                             let pet_inner = temp.find((sample_pet) => sample_pet.id === pet.ID);
+                                                                             if (!pet_inner) {
+                                                                                 temp.push({
+                                                                                     label: petNames[pet.ID].name,
+                                                                                     pet: pet,
+                                                                                     id: pet.ID,
+                                                                                     placement: 'auto',
+                                                                                     parameters: {
+                                                                                         team: 0,
+                                                                                         damageBias: 17,
+                                                                                     },
+                                                                                 });
+                                                                             } else {
+                                                                                 throw new Error(`should not have an existing pet in this list!`);
+                                                                             }
+                                                                             return temp;
+                                                                         });
 
-                                                                        setRefreshGroups(true);
-                                                                        return;
+                                                                         setRefreshGroups(true);
+                                                                         return;
 
-                                                                    }}
+                                                                     }}
                                                                 >
                                                                     <Image
                                                                         fill
                                                                         src={pinIcon}
-                                                                        alt='push pin'
+                                                                        alt="push pin"
                                                                     />
                                                                 </div>
                                                                 {/* <img alt='push pin'
@@ -2880,7 +3025,7 @@ export default function Expeditions() {
                                                     </div>
 
                                                 </div>
-                                            )
+                                            );
                                         })}
                                     </div>
                                 </div>
@@ -2893,7 +3038,7 @@ export default function Expeditions() {
             {/* Grid Right */}
             <div style={{ display: 'flex', flex: '1' }}>
                 <div
-                    className='importantText'
+                    className="importantText"
                     style={{
                         border: '2px solid rgba(255,255,255,0.8)',
                         borderRadius: '6px',
@@ -2903,7 +3048,7 @@ export default function Expeditions() {
                         backgroundColor: 'rgba(255,255,255, 0.05)',
                         // width: 'calc(100% - 66%)',
                         minWidth: '200px',
-                        overflow: 'hidden'
+                        overflow: 'hidden',
                     }}
                 >
                     <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '0' }}>
@@ -2913,33 +3058,46 @@ export default function Expeditions() {
                             width: '100%',
                             borderBottom: '2px solid rgba(255,255,255,0.8)',
                             backgroundColor: 'rgba(255,255,255,0.12)',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
                         }}>
                             <div style={{ fontWeight: 'bold', fontSize: '30px' }}>
                                 {`Available Pets`}
                             </div>
-                            <div style={{ fontWeight: 'bold', alignSelf: 'end', marginLeft: '6px', marginBottom: '5px', fontSize: '16px' }}>
+                            <div style={{
+                                fontWeight: 'bold',
+                                alignSelf: 'end',
+                                marginLeft: '6px',
+                                marginBottom: '5px',
+                                fontSize: '16px',
+                            }}>
                                 (click to enable/disable)
                             </div>
                         </div>
                         <div style={{ display: 'flex' }}>
 
-                            <div className='hover' style={{
+                            <div className="hover" style={{
                                 width: '100%',
                                 borderBottom: '2px solid rgba(255,255,255,0.8)',
                                 display: 'flex',
-                                backgroundColor: 'rgba(255,255,255,0.12)'
+                                backgroundColor: 'rgba(255,255,255,0.12)',
                             }}>
-                                <div style={{ width: '25%', borderRight: '2px solid rgba(255,255,255,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1px' }} onClick={(e) => {
+                                <div style={{
+                                    width: '25%',
+                                    borderRight: '2px solid rgba(255,255,255,0.8)',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    marginTop: '1px',
+                                }} onClick={(e) => {
                                     ReactGA.event({
-                                        category: "expedition_pets",
+                                        category: 'expedition_pets',
                                         action: 'enabled_all',
-                                        label: 'expedition'
-                                    })
+                                        label: 'expedition',
+                                    });
                                     if (data.PetsCollection) {
                                         let petArr = [];
                                         for (let i = 1; i < data.PetsCollection.length; i++) {
-                                            petArr.push(data.PetsCollection[i].ID)
+                                            petArr.push(data.PetsCollection[i].ID);
                                         }
                                         handleItemSelected(petArr);
                                     }
@@ -2947,49 +3105,69 @@ export default function Expeditions() {
                                 }}>
                                     Enable All
                                 </div>
-                                <div className='hover' style={{ width: '25%', borderRight: '2px solid rgba(255,255,255,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1px' }}
-                                    onClick={(e) => {
-                                        ReactGA.event({
-                                            category: "expedition_pets",
-                                            action: 'disabled_all',
-                                            label: 'expedition'
-                                        })
-                                        if (data.PetsCollection) {
-                                            handleItemSelected([]);
-                                        }
+                                <div className="hover" style={{
+                                    width: '25%',
+                                    borderRight: '2px solid rgba(255,255,255,0.8)',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    marginTop: '1px',
+                                }}
+                                     onClick={(e) => {
+                                         ReactGA.event({
+                                             category: 'expedition_pets',
+                                             action: 'disabled_all',
+                                             label: 'expedition',
+                                         });
+                                         if (data.PetsCollection) {
+                                             handleItemSelected([]);
+                                         }
 
-                                    }}>
+                                     }}>
                                     Disable All
                                 </div>
-                                <div className='hover' style={{ width: '25%', borderRight: '2px solid rgba(255,255,255,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1px' }}
-                                    onClick={(e) => {
-                                        ReactGA.event({
-                                            category: "expedition_pets",
-                                            action: 'reset_all',
-                                            label: 'expedition'
-                                        })
-                                        if (data.PetsCollection) {
-                                            let petArr = [];
-                                            for (let i = 0; i < originalPets.length; i++) {
-                                                petArr.push(originalPets[i].ID)
-                                            }
-                                            handleItemSelected(petArr);
-                                            setManualEnabledPets({});
-                                        }
+                                <div className="hover" style={{
+                                    width: '25%',
+                                    borderRight: '2px solid rgba(255,255,255,0.8)',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    marginTop: '1px',
+                                }}
+                                     onClick={(e) => {
+                                         ReactGA.event({
+                                             category: 'expedition_pets',
+                                             action: 'reset_all',
+                                             label: 'expedition',
+                                         });
+                                         if (data.PetsCollection) {
+                                             let petArr = [];
+                                             for (let i = 0; i < originalPets.length; i++) {
+                                                 petArr.push(originalPets[i].ID);
+                                             }
+                                             handleItemSelected(petArr);
+                                             setManualEnabledPets({});
+                                         }
 
-                                    }}>
+                                     }}>
                                     Reset
                                 </div>
-                                <div className='hover' style={{ width: '25%', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1px' }}
-                                    onClick={(e) => {
-                                        ReactGA.event({
-                                            category: "expedition_pets",
-                                            action: 'toggle_hide_locked',
-                                            label: hideLocked ? 'show_locked' : 'hide_locked',
-                                            value: hideLocked as any
-                                        })
-                                        setHideLocked(!hideLocked);
-                                    }}
+                                <div className="hover" style={{
+                                    width: '25%',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    marginTop: '1px',
+                                }}
+                                     onClick={(e) => {
+                                         ReactGA.event({
+                                             category: 'expedition_pets',
+                                             action: 'toggle_hide_locked',
+                                             label: hideLocked ? 'show_locked' : 'hide_locked',
+                                             value: hideLocked as any,
+                                         });
+                                         setHideLocked(!hideLocked);
+                                     }}
                                 >
                                     {hideLocked ? `Show Locked` : `Hide Locked`}
                                 </div>
@@ -3014,9 +3192,7 @@ export default function Expeditions() {
             </div>
 
             {/* pillar right  */}
-            <div id='right_pillar_160' style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', }} />
-
-
-        </div >
+            <div id="right_pillar_160" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}/>
+        </div>
     );
 }
