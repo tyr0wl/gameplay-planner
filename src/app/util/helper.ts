@@ -11,7 +11,7 @@ var helper = {
     roundThreeDecimal: function (number) {
         return Math.round((number + Number.EPSILON) * 1000) / 1000;
     },
-    roundFiveDecimal: function (number) {
+    roundFiveDecimal: function (number: number): number {
         return Math.round((number + Number.EPSILON) * 100000) / 100000;
     },
     roundInt: function (num) {

@@ -56,7 +56,12 @@ import card_label_34 from '@images/cards_v2/labels/card34.png';
 import card_label_35 from '@images/cards_v2/labels/card35.png';
 import card_label_38 from '@images/cards_v2/labels/card38.png';
 
-export const cardMapImg = {
+import Decimal, { DecimalSource } from 'break_infinity.js';
+import { StaticImageData } from 'next/image';
+
+export type CardMapImg = { [cardId: number]: { img: StaticImageData } };
+
+export const cardMapImg: CardMapImg = {
     1: {
         img: card1
     },
@@ -140,9 +145,9 @@ export const cardMapImg = {
     },
 }
 
+export type CardLabelImg = { [cardId: number]: { img: StaticImageData } };
 
-
-export const cardLabelImg = {
+export const cardLabelImg: CardLabelImg = {
     1: {
         img: card_label_1
     },
@@ -226,9 +231,6 @@ export const cardLabelImg = {
     },
 }
 
-
-
-
 export const POTATO = 1;
 export const CLASSEXP = 2;
 export const SKULL = 3;
@@ -259,12 +261,20 @@ export const MININGEXP = 34;
 export const MININGPWR = 35;
 export const SWEETPOTATOE = 38;
 
-
 export const maxKey = 30;
 
+export type CardIDMapData = {
+    id: number,
+    label: string,
+    icon: string,
+    weights: { [ascension: number]: number },
+}
 
+export type CardIDMap = {
+    [cardId: number]: CardIDMapData
+};
 
-export const cardIDMap = {
+export const cardIDMap: CardIDMap = {
     [POTATO]: {
         id: POTATO, label: "Potatoes", icon: "", weights: {
             0: 0,
@@ -1282,14 +1292,12 @@ export const cardIDMap = {
     },
 }
 
-export function powerFormula(Pow, logBase, customConstant, params?) {
-
-    params = params ? params : {};
+export function powerFormula(Pow: DecimalSource, logBase: number, customConstant: DecimalSource, params: { ID?: number, isPerm?: boolean } = {}) {
     const ID = params.ID ? params.ID : 1;
     const isPerm = params.isPerm ? params.isPerm : false;
 
-
     let base = 1.2;
+
     if (!isPerm) {
         switch (ID) {
             case 23:
@@ -1317,18 +1325,30 @@ export function powerFormula(Pow, logBase, customConstant, params?) {
                 base = 1.1;
         }
     }
+
     let result = mathHelper.pow(
         base,
         mathHelper.logDecimal(Pow, logBase)
     );
+
     result = mathHelper.multiplyDecimal(result, customConstant);
 
     result = isPerm ? mathHelper.multiplyDecimal(result, 0.5) : result;
     result = mathHelper.addDecimal(result, 1);
+
     return result;
 }
 
-export const tempPowerBonusFormula = {
+export type PowerBonusFunction = (pow: DecimalSource) => Decimal;
+export type PowerBonusFormula = {
+    [id: number]: PowerBonusFunction,
+};
+
+export type TempPowerBonusFormula = PowerBonusFormula & {
+    "_": (pow: DecimalSource) => number,
+};
+
+export const tempPowerBonusFormula: TempPowerBonusFormula = {
     17: (Pow) => powerFormula(Pow, 1.5, 0.015),
     1: (Pow) => powerFormula(Pow, 1.3, 0.018),
     2: (Pow) => powerFormula(Pow, 1.35, 0.016),
@@ -1367,7 +1387,7 @@ export const tempPowerBonusFormula = {
     _: (Pow) => 1.0
 };
 
-export const permPowerBonusFormula = {
+export const permPowerBonusFormula: PowerBonusFormula = {
     17: (Pow) => powerFormula(Pow, 1.5, 0.015, { isPerm: true, ID: 1 }),
     1: (Pow) => powerFormula(Pow, 1.3, 0.018, { isPerm: true, ID: 1 }),
     2: (Pow) => powerFormula(Pow, 1.35, 0.016, { isPerm: true, ID: 1 }),
@@ -1415,7 +1435,7 @@ export const CARD_DISPLAY_IDS = [
     6, 5, 19, 18, 20, MININGEXP, MININGPWR
 ];
 
-export const defaultWeights = {
+export const defaultWeights: { [cardId: number]: number } = {
     1: -1,
     2: -1,
     3: -1,

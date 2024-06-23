@@ -105,6 +105,7 @@ const ItemSelection = ({ selectedItems, onItemSelected, data, weightMap, default
                                 weightMap={weightMap}
                                 defaultRank={defaultRank}
                                 circleBorder={true}
+                                fullPetData={null}
                             />
                         </div>
                     );

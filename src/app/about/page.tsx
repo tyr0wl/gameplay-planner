@@ -2,8 +2,7 @@ import Cards from './page_content';
 
 import Ad_Comp from '../util/ads_component';
 
-export async function generateMetadata({ params, searchParams }, parent) {
-
+export async function generateMetadata() {
   return {
     title: 'Gratitude - Donation + Outreach - Gameplay Planner',
     description: "Donations for helping keep the Gameplay planner up and running for everyone and a discord social link to reach out to me"

@@ -1,11 +1,11 @@
-import mathHelper from '../util/math';
+    import mathHelper from '../util/math';
 import { resource_type } from './outpost_mapping';
 
 import Image from 'next/image'
 import rightArrow from '@images/icons/right_arrow_white.svg';
 
 
-export default function Outposts({ deal, borderBottom }) {
+export default function TradeLine({ deal, borderBottom }) {
     try {
         const cost_item = resource_type[deal.CostResourceID];
         const cost_label = cost_item.label;
